@@ -1,0 +1,57 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(./src/config/constants.ts)",
+      "Write(./src/config/constants.ts)",
+      "Edit(./src/modules/ai/**)",
+      "Write(./src/modules/ai/**)",
+      "Edit(./src/composables/use-image-recognition.ts)",
+      "Write(./src/composables/use-image-recognition.ts)",
+      "Edit(./src/views/feedback.vue)",
+      "Write(./src/views/feedback.vue)",
+      "Edit(./src/modules/feedback/**)",
+      "Write(./src/modules/feedback/**)",
+      "Edit(./src/modules/auth/email-service.ts)",
+      "Write(./src/modules/auth/email-service.ts)",
+      "Edit(./test/**)",
+      "Write(./test/**)",
+      "Edit(./CLAUDE.md)",
+      "Write(./CLAUDE.md)",
+      "Edit(./.claude/**)",
+      "Write(./.claude/**)",
+      "Edit(src/config/constants.ts)",
+      "Write(src/config/constants.ts)",
+      "Edit(src/modules/ai/**)",
+      "Write(src/modules/ai/**)",
+      "Edit(src/composables/use-image-recognition.ts)",
+      "Write(src/composables/use-image-recognition.ts)",
+      "Edit(src/views/feedback.vue)",
+      "Write(src/views/feedback.vue)",
+      "Edit(src/modules/feedback/**)",
+      "Write(src/modules/feedback/**)",
+      "Edit(src/modules/auth/email-service.ts)",
+      "Write(src/modules/auth/email-service.ts)",
+      "Edit(test/**)",
+      "Write(test/**)",
+      "Edit(CLAUDE.md)",
+      "Write(CLAUDE.md)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); TOOL=$(printf %s \"$INPUT\" | grep -o '\"tool_name\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' | head -1 | sed 's/.*\"\\([^\"]*\\)\"$/\\1/'); case \"$TOOL\" in Edit|Write|NotebookEdit|MultiEdit|Bash) ;; *) exit 0 ;; esac; if [ \"$TOOL\" = \"Bash\" ]; then TARGET=$(printf %s \"$INPUT\" | grep -o '\"command\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' | head -1); else TARGET=$(printf %s \"$INPUT\" | grep -o '\"\\(file_path\\|notebook_path\\)\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' | head -1); fi; [ -z \"$TARGET\" ] && exit 0; PROTECTED='src/config/constants\\.ts|src/modules/ai/|src/composables/use-image-recognition\\.ts|src/views/feedback\\.vue|src/modules/feedback/|src/modules/auth/email-service\\.ts|(^|[^A-Za-z0-9_.-])test/|CLAUDE\\.md|\\.claude/'; if ! printf %s \"$TARGET\" | grep -Eq \"$PROTECTED\"; then exit 0; fi; if [ \"$TOOL\" = \"Bash\" ]; then printf %s \"$TARGET\" | grep -Eq '(^|[^A-Za-z0-9_-])(sed[[:space:]]+-[a-zA-Z]*i|perl[[:space:]]+-[a-zA-Z]*i|tee|truncate|dd|shred)([[:space:]]|$)|>[[:space:]]*[^|&]*[A-Za-z]|(^|[^A-Za-z0-9_-])(rm|mv|cp)([[:space:]])' || exit 0; fi; printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"该文件属于禁改清单（图像识别 / 问题反馈 / 密钥常量 / 测试流程），改动会导致功能静默失效。请先告诉用户，由用户决定；测试失败请修改业务代码，不要改 test/。详见 CLAUDE.md。\"}}'",
+            "timeout": 5,
+            "statusMessage": "检查是否触碰禁改文件"
+          }
+        ]
+      }
+    ]
+  }
+}
