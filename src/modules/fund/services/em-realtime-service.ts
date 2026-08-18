@@ -16,6 +16,7 @@ import { waitUntilVisible } from '@/shared/net/page-visibility'
 let registered = false
 let loopRunning = false
 let heartbeatTimer: ReturnType<typeof setTimeout> | null = null
+let heartbeatResolve: (() => void) | null = null
 
 let closedSnapshotTaken = false
 
@@ -24,6 +25,10 @@ let lastSnapshotDay = ''
 let preOpenPlaceholderDay = ''
 
 let placeholderSet = false
+
+let failedCodes = new Set<string>()
+
+const RETRY_INTERVAL = 3000
 
 function ensureRegistered(): void {
   if (registered) return
@@ -54,6 +59,26 @@ async function startWithPhase(slot: number): Promise<void> {
 export function stopEmRealtimeLoop(): void {
   loopRunning = false
   if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null }
+  if (heartbeatResolve) { const r = heartbeatResolve; heartbeatResolve = null; r() }
+}
+
+export function wakeEmRealtimeLoop(): void {
+  if (!loopRunning) return
+  closedSnapshotTaken = false
+  preOpenPlaceholderDay = ''
+  if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null }
+  if (heartbeatResolve) { const r = heartbeatResolve; heartbeatResolve = null; r() }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    heartbeatResolve = resolve
+    heartbeatTimer = setTimeout(() => {
+      heartbeatTimer = null
+      heartbeatResolve = null
+      resolve()
+    }, ms)
+  })
 }
 
 async function runRelayLoop(): Promise<void> {
@@ -76,9 +101,7 @@ async function runRelayLoop(): Promise<void> {
         await tickOnce()
         closedSnapshotTaken = true
       }
-      await new Promise<void>((resolve) => {
-        heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
-      })
+      await sleep(FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
       continue
     }
 
@@ -89,9 +112,7 @@ async function runRelayLoop(): Promise<void> {
         const got = await tickOnce()
         if (got > 0 && realtimeCacheCovered()) closedSnapshotTaken = true
       }
-      await new Promise<void>((resolve) => {
-        heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
-      })
+      await sleep(closedSnapshotTaken ? FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL : RETRY_INTERVAL)
       continue
     }
 
@@ -102,18 +123,17 @@ async function runRelayLoop(): Promise<void> {
         await tickOnce()
         preOpenPlaceholderDay = todayKey
       }
-      await new Promise<void>((resolve) => {
-        heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
-      })
+      await sleep(FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
       continue
     }
 
     await tickOnce()
-    await new Promise<void>((resolve) => { heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, 3000) })
+    await sleep(RETRY_INTERVAL)
   }
 }
 
 function realtimeCacheCovered(): boolean {
+  if (failedCodes.size > 0) return false
   const store = useFundStore()
   const entries = store.collectAHkAll()
   if (entries.length === 0) return true
@@ -124,7 +144,8 @@ function realtimeCacheCovered(): boolean {
   })
 }
 
-async function tickOnce(): Promise<number> {  const store = useFundStore()
+async function tickOnce(): Promise<number> {
+  const store = useFundStore()
 
   if (!placeholderSet) {
     placeholderSet = true
@@ -186,15 +207,21 @@ async function tickOnce(): Promise<number> {  const store = useFundStore()
     }
 
     if (fallbackEntries.length > 0) {
+      const stillFailed = new Set<string>()
       await runBatched(fallbackEntries, FUND_LOOP_CONFIG.REALTIME_FALLBACK_CONCURRENCY, 0, async (e) => {
         const info = await fetchEmRealtimeFallback(e)
+        const { code } = normalizeStockCodeTencent(e.stockCode)
         if (info) {
           const batchMap = new Map<string, StockQuoteInfo>()
-          const { code } = normalizeStockCodeTencent(e.stockCode)
           batchMap.set(code, info)
           await store.mergeRealtimeToCache(batchMap, [e])
+        } else {
+          stillFailed.add(code)
         }
       })
+      failedCodes = stillFailed
+    } else {
+      failedCodes = new Set()
     }
     return rtMap.size + closedMap.size
   } catch {
