@@ -15,7 +15,10 @@ import { waitUntilVisible } from '@/shared/net/page-visibility'
 let registered = false
 let loopRunning = false
 let heartbeatTimer: ReturnType<typeof setTimeout> | null = null
+let heartbeatResolve: (() => void) | null = null
 let placeholderSet = false
+
+let failedCodes = new Set<string>()
 
 function ensureRegistered(): void {
   if (registered) return
@@ -42,6 +45,24 @@ async function startWithPhase(slot: number): Promise<void> {
 export function stopYahooLoop(): void {
   loopRunning = false
   if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null }
+  if (heartbeatResolve) { const r = heartbeatResolve; heartbeatResolve = null; r() }
+}
+
+export function wakeYahooLoop(): void {
+  if (!loopRunning) return
+  if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null }
+  if (heartbeatResolve) { const r = heartbeatResolve; heartbeatResolve = null; r() }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    heartbeatResolve = resolve
+    heartbeatTimer = setTimeout(() => {
+      heartbeatTimer = null
+      heartbeatResolve = null
+      resolve()
+    }, ms)
+  })
 }
 
 const searchViaWorker: SearchYahooSymbol = async (keyword, count, includeEtf) => {
@@ -65,15 +86,11 @@ async function runRelayLoop(): Promise<void> {
     const hadMissing = await tickOnce()
     if (!loopRunning) break
     if (hadMissing) {
-      await new Promise<void>((resolve) => {
-        heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, RETRY_INTERVAL)
-      })
+      await sleep(RETRY_INTERVAL)
       continue
     }
 
-    await new Promise<void>((resolve) => {
-      heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
-    })
+    await sleep(FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
   }
 }
 
@@ -120,6 +137,13 @@ async function tickOnce(): Promise<boolean> {
     const rtEntries = overseasAll
       .map(e => ({ e, sym: symbolMap.get(normalizeStockCodeTencent(e.stockCode).code) }))
       .filter(x => x.sym) as Array<{ e: StockEntry; sym: { symbol: string; market: StockMarket } }>
+    if (failedCodes.size > 0) {
+      rtEntries.sort((a, b) => {
+        const ca = failedCodes.has(normalizeStockCodeTencent(a.e.stockCode).code) ? 0 : 1
+        const cb = failedCodes.has(normalizeStockCodeTencent(b.e.stockCode).code) ? 0 : 1
+        return ca - cb
+      })
+    }
     tasks.push(runMode(rtEntries, 'realtime').then(fetched => ({ mode: 'realtime' as const, fetched })))
 
     const results = await Promise.all(tasks)
@@ -208,8 +232,10 @@ async function runMode(
           session: r.session,
           updatedAt: mode === 'realtime' ? Date.now() : undefined,
         })
+        if (mode === 'realtime') failedCodes.delete(code)
       } else {
         nullCnt++
+        if (mode === 'realtime') failedCodes.add(code)
       }
     }
     if (nullCnt) {
