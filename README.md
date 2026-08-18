@@ -160,11 +160,6 @@ npm run test        # 全绿才提交
 <br/>
 
 <div align="center">
-  <p>
-    <img src="https://img.shields.io/github/license/L-newbie/real-time-valuation?style=flat-square&color=6366f1" />
-    <img src="https://img.shields.io/github/stars/L-newbie/real-time-valuation?style=flat-square&color=eab308" />
-    <img src="https://img.shields.io/github/issues/L-newbie/real-time-valuation?style=flat-square&color=ef4444" />
-  </p>
   <p style="color:#64748b;font-size:0.9rem;margin-top:16px;">
     ⭐ 如果这个项目对你有帮助，欢迎 Star 支持
   </p>
