@@ -6,6 +6,7 @@ import { useHoldingStore } from '@/modules/holding/holding-store'
 import { useGroupStore } from '@/modules/group/group-store'
 import { useSettingsStore } from '@/modules/settings/settings-store'
 import type { IntradayPoint } from '@/modules/fund/fund-types'
+import type { StatsValuation } from '@/modules/holding/holding-types'
 import { ChangeDirection } from '@/config/enums'
 import { safeParseFloat, displayRate, roundMoney } from '@/shared/utils/safe-math'
 import { formatValuationTime, formatHoldingDate } from '@/shared/utils/date-format'
@@ -173,9 +174,14 @@ export function useFundData() {
   })
 
   const dashboardStats = computed(() => {
-    const vMap = new Map<string, { gz: number; dwjz: number; gszzl: number; isEstimated?: boolean; jzrq?: string; delayDays?: 1 | 2 }>()
+    const vMap = new Map<string, StatsValuation>()
     for (const [code, v] of fundStore.valuationMap) {
-      vMap.set(code, { gz: v.gz, dwjz: v.dwjz, gszzl: v.gszzl, isEstimated: v.isEstimated, jzrq: v.jzrq, delayDays: v.delayDays })
+      vMap.set(code, {
+        gz: v.gz, dwjz: v.dwjz, gszzl: v.gszzl, isEstimated: v.isEstimated, jzrq: v.jzrq, delayDays: v.delayDays,
+        realtimeGszzl: settingsStore.enablePrediction ? v.realtimeGszzl : undefined,
+        realtimeSource: settingsStore.enablePrediction ? v.realtimeSource : undefined,
+        realtimeUpdatedAt: settingsStore.enablePrediction ? v.realtimeUpdatedAt : undefined,
+      })
     }
     return holdingStore.getDashboardStats(vMap)
   })

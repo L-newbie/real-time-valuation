@@ -82,6 +82,7 @@ import { useSettingsStore } from '@/modules/settings/settings-store'
 import { currentMinuteTick } from '@/composables/use-clock-tick'
 import { formatCompactMoney, formatProfitCompact } from '@/shared/utils/money-format'
 import type { GroupStats } from '@/modules/group/group-types'
+import type { StatsValuation } from '@/modules/holding/holding-types'
 
 const router = useRouter()
 const fundStore = useFundStore()
@@ -94,9 +95,14 @@ const minuteTick = currentMinuteTick()
 
 const valuationMap = computed(() => {
   void minuteTick.value
-  const m = new Map<string, { gz: number; dwjz: number; gszzl: number; isEstimated?: boolean; jzrq?: string; delayDays?: 1 | 2 }>()
+  const m = new Map<string, StatsValuation>()
   for (const [code, v] of fundStore.valuationMap) {
-    m.set(code, { gz: v.gz, dwjz: v.dwjz, gszzl: v.gszzl, isEstimated: v.isEstimated, jzrq: v.jzrq, delayDays: v.delayDays })
+    m.set(code, {
+      gz: v.gz, dwjz: v.dwjz, gszzl: v.gszzl, isEstimated: v.isEstimated, jzrq: v.jzrq, delayDays: v.delayDays,
+      realtimeGszzl: settingsStore.enablePrediction ? v.realtimeGszzl : undefined,
+      realtimeSource: settingsStore.enablePrediction ? v.realtimeSource : undefined,
+      realtimeUpdatedAt: settingsStore.enablePrediction ? v.realtimeUpdatedAt : undefined,
+    })
   }
   return m
 })

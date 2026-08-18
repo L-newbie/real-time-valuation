@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import type { Holding, FundValuation } from '@/modules/fund/fund-types'
-import type { HoldingAction, PendingAction, DashboardStats } from './holding-types'
+import type { HoldingAction, PendingAction, DashboardStats, StatsValuation } from './holding-types'
 import { HoldingActionType, PendingActionStatus } from './holding-types'
 import { beijingNow } from '@/shared/utils/date-format'
 import { dropTradeMarks, dropAllTradeMarks, findDateByNav } from './trade-marks'
@@ -182,8 +182,17 @@ export const useHoldingStore = defineStore('holding', () => {
     return ProfitStatus.BreakEven
   }
 
+  function isPredictionUsable(v?: StatsValuation): boolean {
+    if (!v) return false
+    if (v.delayDays !== 2) return false
+    const rt = v.realtimeGszzl
+    if (rt == null || !Number.isFinite(rt)) return false
+    if (rt === 0 && !v.realtimeUpdatedAt && v.realtimeSource === '实时') return false
+    return true
+  }
+
   function getDashboardStats(
-    valuationMap: Map<string, { gz: number; dwjz: number; gszzl: number; isEstimated?: boolean; jzrq?: string; delayDays?: 1 | 2 }>,
+    valuationMap: Map<string, StatsValuation>,
     groupId?: string,
   ): DashboardStats {
     const list = groupId == null
@@ -194,7 +203,7 @@ export const useHoldingStore = defineStore('holding', () => {
 
   function statsFromHoldings(
     list: Holding[],
-    valuationMap: Map<string, { gz: number; dwjz: number; gszzl: number; isEstimated?: boolean; jzrq?: string; delayDays?: 1 | 2 }>,
+    valuationMap: Map<string, StatsValuation>,
   ): DashboardStats {
     const byFund = new Map<string, Holding[]>()
     for (const h of list) {
@@ -204,6 +213,7 @@ export const useHoldingStore = defineStore('holding', () => {
     }
 
     let totalHoldingAmount = 0, totalProfit = 0, totalCost = 0, todayProfitSum = 0, totalYesterdayAmount = 0
+    let predictedProfitSum = 0, predictedBaseSum = 0, predictedFundCount = 0
     for (const [code, hs] of byFund) {
       const v = valuationMap.get(code)
 
@@ -233,6 +243,12 @@ export const useHoldingStore = defineStore('holding', () => {
       const todayBase = confirmedBase > 0 ? confirmedBase : fallbackBase
       const todayProfit = todayBase > 0 ? roundMoney(todayBase * displayRateSafe(v?.gszzl) / 100) : 0
 
+      if (todayBase > 0 && isPredictionUsable(v)) {
+        predictedProfitSum += roundMoney(todayBase * displayRateSafe(v!.realtimeGszzl) / 100)
+        predictedBaseSum += todayBase
+        predictedFundCount++
+      }
+
       totalHoldingAmount += baseAmount
       totalProfit += roundMoney(baseAmount - principal)
       todayProfitSum += todayProfit
@@ -241,6 +257,7 @@ export const useHoldingStore = defineStore('holding', () => {
 
     const overallChangeRate = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0
     const todayReturnRate = totalYesterdayAmount > 0 ? (todayProfitSum / totalYesterdayAmount) * 100 : 0
+    const hasPrediction = predictedFundCount > 0 && predictedBaseSum > 0
     return {
       totalHoldingAmount: roundMoney(totalHoldingAmount),
       todayProfit: roundMoney(todayProfitSum),
@@ -248,11 +265,16 @@ export const useHoldingStore = defineStore('holding', () => {
       overallChangeRate: safeParseFloat(displayRate(overallChangeRate)),
       totalCost: roundMoney(totalCost),
       todayReturnRate: safeParseFloat(displayRate(todayReturnRate)),
+      predictedProfit: hasPrediction ? roundMoney(predictedProfitSum) : null,
+      predictedReturnRate: hasPrediction
+        ? safeParseFloat(displayRate((predictedProfitSum / predictedBaseSum) * 100))
+        : null,
+      predictedFundCount,
     }
   }
 
   function getAllGroupsStats(
-    valuationMap: Map<string, { gz: number; dwjz: number; gszzl: number; isEstimated?: boolean; jzrq?: string; delayDays?: 1 | 2 }>,
+    valuationMap: Map<string, StatsValuation>,
   ): DashboardStats {
     return statsFromHoldings(holdings.value.filter(h => !h.settled), valuationMap)
   }
