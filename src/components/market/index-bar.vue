@@ -155,6 +155,10 @@ function rateClass(q: IndexQuote): string {
   z-index: var(--z-sticky);
 }
 
+.ib.is-open {
+  z-index: var(--z-popover);
+}
+
 .ib-bar {
   display: flex;
   align-items: center;
