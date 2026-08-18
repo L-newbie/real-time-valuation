@@ -40,7 +40,7 @@ export function formatValuationTime(valuationTime: string): string {
 export function formatValuationTimeWithSeconds(valuationTime: string): string {
   if (!valuationTime) return '--'
   if (!dayjs(valuationTime).isValid()) return valuationTime
-  const hasTime = valuationTime.includes(' ') && valuationTime.split(' ')[1]?.trim()
+  const hasTime = /[ T]\d{2}:\d{2}/.test(valuationTime)
   return hasTime
     ? dayjs(valuationTime).format('YYYY-MM-DD HH:mm:ss')
     : dayjs(valuationTime).format('YYYY-MM-DD')
