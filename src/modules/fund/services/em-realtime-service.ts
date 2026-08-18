@@ -87,7 +87,7 @@ async function runRelayLoop(): Promise<void> {
     if (aDone && hkDone) {
       if (!closedSnapshotTaken) {
         const got = await tickOnce()
-        if (got > 0) closedSnapshotTaken = true
+        if (got > 0 && realtimeCacheCovered()) closedSnapshotTaken = true
       }
       await new Promise<void>((resolve) => {
         heartbeatTimer = setTimeout(() => { heartbeatTimer = null; resolve() }, FUND_LOOP_CONFIG.HEARTBEAT_INTERVAL)
@@ -113,8 +113,18 @@ async function runRelayLoop(): Promise<void> {
   }
 }
 
-async function tickOnce(): Promise<number> {
+function realtimeCacheCovered(): boolean {
   const store = useFundStore()
+  const entries = store.collectAHkAll()
+  if (entries.length === 0) return true
+  const cache = store.stockRealtimeCache
+  return entries.every((e) => {
+    const { code } = normalizeStockCodeTencent(e.stockCode)
+    return cache.has(code) || cache.has(e.stockCode)
+  })
+}
+
+async function tickOnce(): Promise<number> {  const store = useFundStore()
 
   if (!placeholderSet) {
     placeholderSet = true
