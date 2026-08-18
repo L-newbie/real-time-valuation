@@ -34,11 +34,11 @@
         <button
           type="button"
           class="today-tag predicted-tag"
-          title="预测收益说明"
-          aria-label="预测收益说明"
+          title="预测明日收益说明"
+          aria-label="预测明日收益说明"
           @click.stop="predictedInfoOpen = true"
         >
-          预测
+          预测明日
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" /><path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3" /><line x1="12" y1="17" x2="12" y2="17" />
           </svg>
@@ -75,8 +75,8 @@
   </section>
   <InfoSheet
     v-model:visible="predictedInfoOpen"
-    title="预测收益"
-    lead="用持仓股的实时行情，抢先估算今天的收益"
+    title="预测明日收益"
+    lead="用持仓股的实时行情，抢先估算明天净值更新后的收益"
     :rows="predictedInfoRows"
     :paragraphs="PREDICTED_INFO_PARAS"
   />
@@ -108,17 +108,18 @@ function toggleCollapse(): void {
 const predictedInfoOpen = ref(false)
 
 const PREDICTED_INFO_PARAS = [
-  '算法：把每只基金昨日的持仓金额，乘上该基金持仓股今天的实时涨跌幅，逐只相加得到预测收益；再除以这些基金的持仓金额合计，得到预测涨跌幅。',
-  '与「今日」的区别：「今日」用的是基金公司发布的官方估值，通常有延迟；「预测」用的是持仓股的实时行情，更快，但只是推算。',
-  '只统计 T+2 且已取到实时行情的基金。T+1 基金、无持仓记录的基金、行情尚未取到的基金都不计入，因此它的持仓金额基数小于总资产。',
+  '这是对「明日净值」的预测。持仓股今天的实时涨跌，通常要到下一个交易日才体现在基金净值上，所以这里估算的是明天净值更新后你能拿到的收益。',
+  '计算基数分两种情况：净值尚未更新时，今日收益还没并入持有金额，基数取「持有金额 + 今日收益」；净值已更新时，今日收益已经并入持有金额，基数直接取「持有金额」。这样两种状态下的基数都等于今天收盘后的实际持有金额，不会重复计算也不会漏算。',
+  '再用该基数乘以基金持仓股的实时涨跌幅，逐只相加得到预测明日收益；除以这些基金的基数合计，得到预测涨跌幅。',
+  '只统计 T+2 且已取到实时行情的基金。T+1 基金、无持仓记录的基金、行情尚未取到的基金都不计入，因此基数合计小于总资产。',
   '误差来源：持仓数据来自最近一期季报，与基金实际持仓存在偏差；未取到行情的个股不参与加权，会让结果偏保守。仅供参考，请以基金公司公布的净值为准。',
 ]
 
 const predictedInfoRows = computed(() => [
   { label: '纳入基金', value: `${props.stats.predictedFundCount} 只`, numeric: false },
-  { label: '预测收益', value: formatProfit(props.stats.predictedProfit), tone: predictedFmt.value.cssClass },
+  { label: '预测明日收益', value: formatProfit(props.stats.predictedProfit), tone: predictedFmt.value.cssClass },
   { label: '预测涨跌幅', value: formatRate(props.stats.predictedReturnRate), tone: predictedFmt.value.cssClass },
-  { label: '官方估值收益', value: formatProfit(props.stats.todayProfit), tone: todayFmt.value.cssClass },
+  { label: '今日收益', value: formatProfit(props.stats.todayProfit), tone: todayFmt.value.cssClass },
 ])
 
 function formatProfit(v: number | null): string {
@@ -353,6 +354,7 @@ function pillClass(v: number): string {
     display: inline-flex;
     padding: 4px;
     margin: -4px;
+    white-space: nowrap;
   }
   .asset-hero.is-collapsed .hero-predicted .predicted-tag svg { display: none; }
 }
