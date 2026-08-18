@@ -16,10 +16,8 @@ export function isUSShare(emMarketCode?: string): boolean {
 }
 
 export function classifyShare(emMarketCode?: string, _code?: string): StockMarket {
-  if (isAShare(emMarketCode)) return 'A'
-  if (isHKShare(emMarketCode)) return 'HK'
-  if (isUSShare(emMarketCode)) return 'US'
-  return 'unknown'
+  if (!emMarketCode) return 'unknown'
+  return EM_MARKET_MAP[emMarketCode] ?? 'unknown'
 }
 
 export function detectMarketByEmCode(emMarketCode: string): StockMarket {
