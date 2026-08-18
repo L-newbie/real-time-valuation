@@ -110,6 +110,12 @@ describe('26 · 交易日历与市场判定', () => {
     t.check('116 为港股', m.classifyShare('116') === 'HK', `实得 ${m.classifyShare('116')}`)
     t.check('105 为美股', m.classifyShare('105') === 'US', `实得 ${m.classifyShare('105')}`)
     t.check('106 为美股', m.classifyShare('106') === 'US', `实得 ${m.classifyShare('106')}`)
+    t.check('124 为日股', m.classifyShare('124') === 'JP', `实得 ${m.classifyShare('124')}`)
+    t.check('130 为韩股', m.classifyShare('130') === 'KR', `实得 ${m.classifyShare('130')}`)
+    t.check('118 为台股', m.classifyShare('118') === 'TW', `实得 ${m.classifyShare('118')}`)
+    t.check('155 为德股', m.classifyShare('155') === 'DE', `实得 ${m.classifyShare('155')}`)
+    t.check('156 为法股', m.classifyShare('156') === 'FR', `实得 ${m.classifyShare('156')}`)
+    t.check('157 为英股', m.classifyShare('157') === 'UK', `实得 ${m.classifyShare('157')}`)
     t.check('未知代码归 unknown', m.classifyShare('999') === 'unknown', `实得 ${m.classifyShare('999')}`)
     t.check('缺省归 unknown', m.classifyShare(undefined) === 'unknown', `实得 ${m.classifyShare(undefined)}`)
 
