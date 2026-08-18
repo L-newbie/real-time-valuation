@@ -7,27 +7,47 @@ import { withBudget } from '@/shared/net/net-budget'
 interface ProxyState {
   failStreak: number
   breakUntil: number
+  lastFailAt: number
+  probeAt: number
 }
 
-const proxyStates: ProxyState[] = PROXY_CANDIDATES.map(() => ({ failStreak: 0, breakUntil: 0 }))
+const proxyStates: ProxyState[] = PROXY_CANDIDATES.map(() => ({ failStreak: 0, breakUntil: 0, lastFailAt: 0, probeAt: 0 }))
+
+const FAIL_DEBOUNCE_MS = 1000
+
+const PROBE_INTERVAL_MS = 5000
 
 function markProxyFail(idx: number): void {
   const s = proxyStates[idx]
+  const now = Date.now()
+  if (now - s.lastFailAt < FAIL_DEBOUNCE_MS) return
+  s.lastFailAt = now
   s.failStreak++
   if (s.failStreak >= PROXY_BREAK_THRESHOLD) {
-    s.breakUntil = Date.now() + PROXY_BREAK_COOLDOWN_MS
+    s.breakUntil = now + PROXY_BREAK_COOLDOWN_MS
   }
 }
 
 function markProxyOk(idx: number): void {
-  proxyStates[idx].failStreak = 0
+  const s = proxyStates[idx]
+  s.failStreak = 0
+  s.breakUntil = 0
+  s.probeAt = 0
 }
 
 function isProxyBroken(idx: number): boolean {
   const s = proxyStates[idx]
-  if (s.breakUntil > Date.now()) return true
-  if (s.breakUntil > 0 && s.breakUntil <= Date.now()) s.breakUntil = 0
-  return false
+  const now = Date.now()
+  if (s.breakUntil <= now) {
+    if (s.breakUntil > 0) s.breakUntil = 0
+    return false
+  }
+
+  if (now - s.probeAt >= PROBE_INTERVAL_MS) {
+    s.probeAt = now
+    return false
+  }
+  return true
 }
 
 function availableProxyIndexes(): number[] {
@@ -76,11 +96,15 @@ export async function fetchWithProxyRotation(
 ): Promise<{ data: any | null; proxyFailed: boolean }> {
   const MAX_RETRY = 2
   let lastReason = ''
+  let attempted = false
+
   for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
     const indexes = availableProxyIndexes()
-    const tryOrder = indexes.length > 0 ? indexes : [0]
-    for (const idx of tryOrder) {
+    if (indexes.length === 0) break
+
+    for (const idx of indexes) {
       const candidate = PROXY_CANDIDATES[idx]
+      attempted = true
       const { data, reason } = await fetchViaProxy(candidate, targetUrl, timeoutMs)
       if (data != null) {
         markProxyOk(idx)
@@ -89,6 +113,10 @@ export async function fetchWithProxyRotation(
       markProxyFail(idx)
       if (reason) lastReason = reason
     }
+  }
+
+  if (!attempted) {
+    return { data: null, proxyFailed: true }
   }
 
   // eslint-disable-next-line no-console
