@@ -182,6 +182,12 @@ export const useHoldingStore = defineStore('holding', () => {
     return ProfitStatus.BreakEven
   }
 
+  function isNavUpdated(v?: StatsValuation): boolean {
+    if (!v) return false
+    if (v.isEstimated !== false) return false
+    return v.jzrq != null && v.jzrq >= getPreviousNTradingDay(1)
+  }
+
   function isPredictionUsable(v?: StatsValuation): boolean {
     if (!v) return false
     if (v.delayDays !== 2) return false
@@ -243,10 +249,13 @@ export const useHoldingStore = defineStore('holding', () => {
       const todayBase = confirmedBase > 0 ? confirmedBase : fallbackBase
       const todayProfit = todayBase > 0 ? roundMoney(todayBase * displayRateSafe(v?.gszzl) / 100) : 0
 
-      if (todayBase > 0 && isPredictionUsable(v)) {
-        predictedProfitSum += roundMoney(todayBase * displayRateSafe(v!.realtimeGszzl) / 100)
-        predictedBaseSum += todayBase
-        predictedFundCount++
+      if (isPredictionUsable(v)) {
+        const predictBase = isNavUpdated(v) ? baseAmount : roundMoney(baseAmount + todayProfit)
+        if (predictBase > 0) {
+          predictedProfitSum += roundMoney(predictBase * displayRateSafe(v!.realtimeGszzl) / 100)
+          predictedBaseSum += predictBase
+          predictedFundCount++
+        }
       }
 
       totalHoldingAmount += baseAmount
