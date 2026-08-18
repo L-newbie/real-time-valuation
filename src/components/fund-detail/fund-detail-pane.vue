@@ -202,12 +202,12 @@
               <div class="hx-sum-item">
                 <span class="hx-sum-k">前十大贡献</span>
                 <span :class="['hx-sum-v font-number', holdingsWeightedChange == null ? 'text-muted' : holdingsWeightedChange > 0 ? 'text-rise' : holdingsWeightedChange < 0 ? 'text-fall' : 'text-flat']">
-                  {{ holdingsWeightedChange == null ? '--' : (holdingsWeightedChange > 0 ? '+' : '') + holdingsWeightedChange.toFixed(2) + '%' }}
+                  {{ holdingsWeightedChange == null ? '--' : (holdingsWeightedChange > 0 ? '+' : '') + holdingsWeightedChange.toFixed(2) + '%' }}<span v-if="holdingsQuotePartial" class="hx-partial" :title="`${holdingsMissingRatio.toFixed(2)}% 持仓行情未就绪，该值偏小`">*</span>
                 </span>
               </div>
               <div class="hx-sum-item">
                 <span class="hx-sum-k">行情就绪</span>
-                <span class="hx-sum-v font-number">{{ holdingsQuoteReady }}/{{ displayHoldings.holdings.length }}</span>
+                <span :class="['hx-sum-v font-number', holdingsQuotePartial && 'text-muted']">{{ holdingsQuoteReady }}/{{ displayHoldings.holdings.length }}</span>
               </div>
             </div>
             <ul class="hx-list">
@@ -679,6 +679,16 @@ const holdingsTotalRatio = computed(() => {
 const holdingsQuoteReady = computed(() => {
   const hs = displayHoldings.value?.holdings ?? []
   return hs.filter(h => stockChange(h) != null).length
+})
+
+const holdingsMissingRatio = computed(() => {
+  const hs = displayHoldings.value?.holdings ?? []
+  return hs.reduce((s, h) => s + (stockChange(h) == null ? (h.ratio ?? 0) : 0), 0)
+})
+
+const holdingsQuotePartial = computed(() => {
+  const hs = displayHoldings.value?.holdings ?? []
+  return hs.length > 0 && holdingsQuoteReady.value < hs.length && holdingsWeightedChange.value != null
 })
 
 const holdingsWeightedChange = computed(() => {
@@ -2377,6 +2387,14 @@ watch(fundCode, (code) => {
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+
+.hx-partial {
+  margin-left: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: help;
 }
 
 .hx-list {
