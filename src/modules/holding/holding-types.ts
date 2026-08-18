@@ -80,6 +80,18 @@ export interface PendingAction {
   createdAt: number
 }
 
+export interface StatsValuation {
+  gz: number
+  dwjz: number
+  gszzl: number
+  isEstimated?: boolean
+  jzrq?: string
+  delayDays?: 1 | 2
+  realtimeGszzl?: number
+  realtimeSource?: string
+  realtimeUpdatedAt?: string
+}
+
 export interface DashboardStats {
   totalHoldingAmount: number
 
@@ -92,4 +104,10 @@ export interface DashboardStats {
   totalCost: number
 
   todayReturnRate: number
+
+  predictedProfit: number | null
+
+  predictedReturnRate: number | null
+
+  predictedFundCount: number
 }
