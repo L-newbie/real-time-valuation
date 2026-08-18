@@ -223,7 +223,7 @@
                     <span class="hx-name">{{ stock.stockName || stock.stockCode }}</span>
                     <span class="hx-meta">
                       <span class="hx-code font-number">{{ stock.stockCode }}</span>
-                      <span v-if="marketLabel(stock) && stock.emMarketCode" class="hx-mkt">{{ marketLabel(stock) }}</span>
+                      <span v-if="rowMarketLabel(stock)" class="hx-mkt">{{ rowMarketLabel(stock) }}</span>
                     </span>
                   </span>
                   <span class="hx-ratio">
@@ -1380,18 +1380,31 @@ function stockQuote(stock: HoldingDetailItem): StockQuoteInfo | undefined {
   return map.get(stock.stockCode)
 }
 
-function marketLabel(stock: HoldingDetailItem): string {
+function marketLabel(stock: HoldingDetailItem, q?: StockQuoteInfo): string {
   const em = stock.emMarketCode
-  if (!em) return '空(待补全)'
-  return EM_MARKET_LABEL[em] || em
+  if (em) return EM_MARKET_LABEL[em] || em
+  const fromQuote = q?.market
+  if (fromQuote && fromQuote !== 'unknown') return SHARE_CLASS_CN[fromQuote] ?? fromQuote
+  return '空(待补全)'
 }
 
-function shareClass(stock: HoldingDetailItem): string {
-  return classifyShare(stock.emMarketCode, stock.stockCode)
+function rowMarketLabel(stock: HoldingDetailItem): string {
+  const em = stock.emMarketCode
+  if (em) return EM_MARKET_LABEL[em] || em
+  const m = stockQuote(stock)?.market
+  return m && m !== 'unknown' ? (SHARE_CLASS_CN[m] ?? m) : ''
+}
+
+function shareClass(stock: HoldingDetailItem, q?: StockQuoteInfo): string {  const byEm = classifyShare(stock.emMarketCode, stock.stockCode)
+  if (byEm !== 'unknown') return byEm
+  return q?.market && q.market !== 'unknown' ? q.market : 'unknown'
 }
 
 const SHARE_CLASS_CN: Record<string, string> = {
-  A: 'A股', HK: '港股', US: '美股', unknown: '未识别',
+  A: 'A股', HK: '港股', US: '美股',
+  JP: '日股', KR: '韩股', TW: '台股',
+  DE: '德股', FR: '法股', UK: '英股',
+  unknown: '未识别',
 }
 
 const TZ_CN: Record<string, string> = {
@@ -1401,7 +1414,10 @@ const TZ_CN: Record<string, string> = {
 
 const MARKET_DESC: Record<string, string> = {
   A: 'A股 · 腾讯/东财', HK: '港股 · 腾讯/东财',
-  US: '美股 · 盘中腾讯/盘外Yahoo', unknown: '未识别 · Yahoo 兜底',
+  US: '美股 · 盘中腾讯/盘外Yahoo',
+  JP: '日股 · Yahoo', KR: '韩股 · Yahoo', TW: '台股 · Yahoo',
+  DE: '德股 · Yahoo', FR: '法股 · Yahoo', UK: '英股 · Yahoo',
+  unknown: '未识别 · Yahoo 兜底',
 }
 
 function contribution(stock: HoldingDetailItem): number | null {
@@ -1423,7 +1439,7 @@ const stockDetails = computed(() => {
   for (const stock of list) {
     if (!expandedStocks.value.has(stock.stockCode)) continue
     const q = stockQuote(stock)
-    const cls = shareClass(stock)
+    const cls = shareClass(stock, q)
     const tz = stockMarketToTz(cls as never)
     let tradingState = '—'
     if (tz !== 'unknown') {
@@ -1432,7 +1448,7 @@ const stockDetails = computed(() => {
     }
     const status = !q ? '未取' : q.closed ? '休盘' : q.changeRate != null ? '已就绪' : '取数中'
     out.set(stock.stockCode, {
-      marketLabel: marketLabel(stock),
+      marketLabel: marketLabel(stock, q),
       shareClass: SHARE_CLASS_CN[cls] ?? cls,
       shareClassRaw: cls,
       source: q?.source || '待取',
@@ -1445,7 +1461,7 @@ const stockDetails = computed(() => {
       contribution: contribution(stock),
       marketDesc: MARKET_DESC[cls] ?? MARKET_DESC.unknown,
       raw: stock.rawEntry || stock.stockCode,
-      noMarket: !stock.emMarketCode,
+      noMarket: !stock.emMarketCode && cls === 'unknown',
       viaYahoo: !!q?.source?.toLowerCase().includes('yahoo'),
     })
   }
