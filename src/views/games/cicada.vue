@@ -215,6 +215,16 @@ onMounted(() => {
   rafId = requestAnimationFrame(frame)
 })
 
+function teardownAudio(): void {
+  toy.auto.on = false
+  autoOn.value = false
+  pointer.down = false
+  pointer.id = null
+  holding.value = false
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  disposeAudio()
+}
+
 onUnmounted(() => {
   stopped = true
   cancelAnimationFrame(rafId)
@@ -225,20 +235,20 @@ onUnmounted(() => {
   cv?.removeEventListener('pointercancel', onPointerUp)
   window.removeEventListener('resize', applySize)
   window.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('visibilitychange', onVisibilityChange)
+  teardownAudio()
   renderer?.dispose()
   renderer = null
-
-  disposeAudio()
 })
 
 onDeactivated(() => {
   stopped = true
   cancelAnimationFrame(rafId)
-  suspendAudio()
+
+  teardownAudio()
 })
 onActivated(() => {
   if (!renderer) return
+  document.addEventListener('visibilitychange', onVisibilityChange)
   stopped = false
   last = performance.now()
   rafId = requestAnimationFrame(frame)
