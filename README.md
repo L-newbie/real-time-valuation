@@ -3,10 +3,6 @@
     <img src="public/banner.svg" alt="基攻宝 — 实时基金估值 · 全球行情追踪 · 财经资讯聚合" width="100%" />
   </a>
 </div>
-<p align="center">
-  <img src="https://shields.io" alt="基金估值">
-  <img src="https://shields.io" alt="基金实时估值">
-</p>
 ---
 
 ## 🚀 部署
