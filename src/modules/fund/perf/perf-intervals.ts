@@ -172,9 +172,32 @@ export function getPerfIntervals(codes: string[]): Map<string, PerfIntervals> {
   return out
 }
 
+export function peekPerfIntervals(codes: string[]): Map<string, PerfIntervals> {
+  const out = new Map<string, PerfIntervals>()
+  for (const code of codes) {
+    const data = perfCache.peek(code)
+    if (data) out.set(code, data)
+  }
+  return out
+}
+
 export function peekNavSeries(fundCode: string): NavPoint[] {
   const data = perfCache.peek(fundCode)
   return data?.nav ?? []
+}
+
+export function peekPerfItems(fundCode: string): { title: string; value: number }[] {
+  const d = perfCache.peek(fundCode)
+  if (!d) return []
+  const rows: { title: string; value: number | null }[] = [
+    { title: '近1周', value: d.week },
+    { title: '近1月', value: d.m1 },
+    { title: '近3月', value: d.m3 },
+    { title: '近6月', value: d.m6 },
+    { title: '近1年', value: d.y1 },
+  ]
+  return rows
+    .filter((r): r is { title: string; value: number } => r.value != null && Number.isFinite(r.value))
 }
 
 export async function fetchMissingPerf(
