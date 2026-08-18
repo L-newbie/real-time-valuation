@@ -889,6 +889,15 @@ export const useFundStore = defineStore('fund', () => {
     return Array.from(map.values())
   }
 
+  function wakeQuoteLoops(): void {
+    void import('@/modules/fund/services/em-realtime-service')
+      .then(m => m.wakeEmRealtimeLoop())
+      .catch(() => {  })
+    void import('@/modules/fund/services/yahoo-service')
+      .then(m => m.wakeYahooLoop())
+      .catch(() => {  })
+  }
+
   async function fetchValuation(fundCode: string): Promise<FundValuation | null> {
     const { getFundValuation } = await import('@/modules/fund/valuation/fund-valuation-merge')
     const data = await getFundValuation(fundCode, getFundType)
@@ -904,6 +913,7 @@ export const useFundStore = defineStore('fund', () => {
         .then(est => {
           if (est?.holdings.length) {
             void recomputeFundsForStocks(est.holdings.map(h => h.stockCode))
+            wakeQuoteLoops()
           }
         })
         .catch(() => {  })
