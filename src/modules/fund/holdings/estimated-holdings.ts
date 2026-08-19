@@ -5,6 +5,7 @@ import type { StockQuoteInfo } from '@/shared/types/common-types'
 import { isValidFundCode } from '@/shared/utils/validation'
 import { fetchTop10FromMobileApi } from './f10-mobile-fetch'
 import { fetchTop10FromPingzhong, enrichMarketCodeFromPingzhong, enrichNamesFromFundSharesPositions, loadPingzhongHoldings, type PingzhongPreloaded } from './pingzhong-holdings-fetch'
+import { fetchDanjuanHoldings, fetchDanjuanRatios } from './danjuan-holdings-fetch'
 import { loadPingzhong } from '@/shared/net/pingzhong-loader'
 
 export type FetchStockQuotes = (
@@ -14,9 +15,30 @@ export type FetchStockQuotes = (
 
 const noopFetchStockQuotes: FetchStockQuotes = async () => new Map()
 
+type HoldingsSource = 'danjuan' | 'mobile' | 'pingzhong'
+
 async function loadPingzhongRaw(fundCode: string): Promise<unknown> {
   const g = await loadPingzhong(fundCode)
   return g?.Data_fundSharesPositions ?? null
+}
+
+function fillRatiosFromMap(holdings: FundAllHoldings['holdings'], ratios: Map<string, number>): boolean {
+  let changed = false
+  for (const h of holdings) {
+    if (h.ratio > 0) continue
+    const key = h.stockCode.toUpperCase()
+    let r = ratios.get(key)
+    if (r == null && /^\d+$/.test(key)) r = ratios.get(String(parseInt(key, 10)))
+    if (r != null && r > 0) { h.ratio = r; changed = true }
+  }
+  return changed
+}
+
+async function fetchTop10FromDanjuan(fundCode: string): Promise<FundAllHoldings | null> {
+  const holdings = await fetchDanjuanHoldings(fundCode)
+  if (!holdings || holdings.length === 0) return null
+  if (!holdings.some(h => h.ratio > 0)) return null
+  return { reportDate: '', reportType: '季报', isFull: false, holdings: holdings.slice(0, 10) }
 }
 
 export async function fetchEstimatedHoldings(
@@ -27,15 +49,19 @@ export async function fetchEstimatedHoldings(
 ): Promise<EstimatedHoldings | null> {
   if (!isValidFundCode(fundCode)) return null
 
-  let top10: FundAllHoldings | null = await fetchTop10FromMobileApi(fundCode)
-  let fallbackUsed = false
+  let source: HoldingsSource = 'danjuan'
+  let top10: FundAllHoldings | null = await fetchTop10FromDanjuan(fundCode)
   if (!top10 || top10.holdings.length === 0) {
+    source = 'mobile'
+    top10 = await fetchTop10FromMobileApi(fundCode)
+  }
+  if (!top10 || top10.holdings.length === 0) {
+    source = 'pingzhong'
     top10 = await fetchTop10FromPingzhong(fundCode, preloaded)
-    fallbackUsed = true
   }
   if (top10 && top10.holdings.length > 0) {
     let holdingsEnrichedReady: Promise<void> | undefined
-    if (!fallbackUsed) {
+    if (source !== 'pingzhong') {
       if (preloaded?.stockCodesNew != null) {
         const pz = await loadPingzhongHoldings(fundCode, preloaded)
         if (pz) enrichMarketCodeFromPingzhong(top10.holdings, pz)
@@ -66,6 +92,12 @@ export async function fetchEstimatedHoldings(
           const g = await loadPingzhongRaw(fundCode)
           if (g) enrichNamesFromFundSharesPositions(top10!.holdings, g, 'override')
         } catch {  }
+        try {
+          if (source !== 'danjuan' && !top10!.holdings.some(h => h.ratio > 0)) {
+            const ratios = await fetchDanjuanRatios(fundCode)
+            if (ratios) fillRatiosFromMap(top10!.holdings, ratios)
+          }
+        } catch {  }
         resolveFill()
       })()
     }
@@ -76,7 +108,7 @@ export async function fetchEstimatedHoldings(
 
     const ratioReady = top10.holdings.some(h => h.ratio > 0)
 
-    return {
+    const result: EstimatedHoldings = {
       fundCode,
       quarterReportDate: top10.reportDate,
       annualReportDate: '',
@@ -85,6 +117,16 @@ export async function fetchEstimatedHoldings(
       optimizationMeta: { method: 'proportional-scaling', navDaysUsed: 0, stockCoverage: 0 },
       holdingsEnrichedReady,
     }
+
+    if (holdingsEnrichedReady) {
+      void holdingsEnrichedReady.then(() => {
+        if (result.description.includes('无占比') && result.holdings.some(h => h.ratio > 0)) {
+          result.description = '前十大重仓及占比'
+        }
+      }).catch(() => {  })
+    }
+
+    return result
   }
 
   return null
