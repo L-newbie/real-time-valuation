@@ -106,10 +106,15 @@ var fund_Rate = "0.15";
 var stockCodes = ["600519","000858"];
 var Data_netWorthTrend = [{"x":1754179200000,"y":1.2236,"equityReturn":-0.42},{"x":1754265600000,"y":1.2340,"equityReturn":0.85}];
 var Data_ACWorthTrend = [[1754179200000,3.4300],[1754265600000,3.4560]];
-var Data_fundSharesPositions = [[1754265600000,88.50]];
-var Data_currentFundManager = [{"name":"张三","workTime":"5年","fundSize":"120.00亿"}];
+var Data_fundSharesPositions = [[1754179200000,86.20],[1754265600000,88.50]];
+var Data_currentFundManager = [{"id":"30001","name":"张三","star":4,"workTime":"5年","fundSize":"120.00亿(2只基金)","power":{"avr":"77.99","categories":["经验值","收益率","抗风险","稳定性","择时能力"],"dsc":["","","","",""],"data":[95.0,91.20,66.70,52.80,70.40],"jzrq":"2026-08-17"},"profit":{"categories":["任期收益","同类平均"],"series":[{"data":[{"name":null,"color":"#7cb5ec","y":208.0946},{"name":null,"color":"#414c7b","y":57.21}]}],"jzrq":"2026-08-17"}}];
 var Data_performanceEvaluation = {"avr":"75.00","categories":["选证能力","收益率","抗风险","稳定性","择时能力"],"dsc":["",""],"data":[70,80,75,72,78]};
 var Data_rateInSimilarType = [{"x":1754265600000,"y":25,"sc":"120"}];
+var Data_rateInSimilarPersent = [[1754179200000,78.5000],[1754265600000,79.1600]];
+var Data_fluctuationScale = {"categories":["2025-06-30","2025-09-30","2025-12-31","2026-03-31"],"series":[{"y":3.60,"mom":"10.10%"},{"y":4.01,"mom":"11.42%"},{"y":15.12,"mom":"276.71%"},{"y":34.49,"mom":"128.09%"}]};
+var Data_holderStructure = {"series":[{"name":"机构持有比例","data":[0.85,2.08,1.6,3.59]},{"name":"个人持有比例","data":[99.15,97.92,98.4,96.41]},{"name":"内部持有比例","data":[0.1,0.25,0.2,0.03]}],"categories":["2024-06-30","2024-12-31","2025-06-30","2025-12-31"]};
+var Data_assetAllocation = {"series":[{"name":"股票占净比","type":null,"data":[66.92,64.68,70.25,68.92],"yAxis":0},{"name":"债券占净比","type":null,"data":[0,0,0,0],"yAxis":0},{"name":"现金占净比","type":null,"data":[22.68,41.07,39.72,19.76],"yAxis":0},{"name":"净资产","type":"line","data":[6.4732,19.7641,45.6891,75.9009],"yAxis":1}],"categories":["2025-09-30","2025-12-31","2026-03-31","2026-06-30"]};
+var Data_buySedemption = {"series":[{"name":"期间申购","data":[3.24,12.28,18.42,3.18]},{"name":"期间赎回","data":[3.30,4.62,7.71,4.90]},{"name":"总份额","data":[3.08,10.74,21.46,19.74]}],"categories":["2025-09-30","2025-12-31","2026-03-31","2026-06-30"]};
 `
 
 /** 基金代码目录 */
