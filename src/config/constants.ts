@@ -49,6 +49,8 @@ export const STORAGE_KEYS = {
 
   YAHOO_SYMBOL_CACHE: 'jgb_yahoo_symbol_cache',
 
+  STOCK_CODE_MAP: 'jgb_stock_code_map',
+
   SECTOR_MARKET: 'jgb_sector_market',
 
   SECTOR_METRIC: 'jgb_sector_metric',

@@ -137,20 +137,32 @@ async function tickOnce(): Promise<boolean> {
     const rtEntries = overseasAll
       .map(e => ({ e, sym: symbolMap.get(normalizeStockCodeTencent(e.stockCode).code) }))
       .filter(x => x.sym) as Array<{ e: StockEntry; sym: { symbol: string; market: StockMarket } }>
-    if (failedCodes.size > 0) {
-      rtEntries.sort((a, b) => {
-        const ca = failedCodes.has(normalizeStockCodeTencent(a.e.stockCode).code) ? 0 : 1
-        const cb = failedCodes.has(normalizeStockCodeTencent(b.e.stockCode).code) ? 0 : 1
-        return ca - cb
-      })
+
+    const rtCache = store.stockRealtimeCache
+    const priorityOf = (x: { e: StockEntry }): number => {
+      const { code } = normalizeStockCodeTencent(x.e.stockCode)
+      if (failedCodes.has(code)) return 0
+      const info = rtCache.get(code) ?? rtCache.get(x.e.stockCode)
+      if (!info || info.changeRate == null) return 1
+      return 2
     }
-    tasks.push(runMode(rtEntries, 'realtime').then(fetched => ({ mode: 'realtime' as const, fetched })))
+    const staleAtOf = (x: { e: StockEntry }): number => {
+      const { code } = normalizeStockCodeTencent(x.e.stockCode)
+      const info = rtCache.get(code) ?? rtCache.get(x.e.stockCode)
+      return info?.updatedAt ?? 0
+    }
+    rtEntries.sort((a, b) => (priorityOf(a) - priorityOf(b)) || (staleAtOf(a) - staleAtOf(b)))
+
+    tasks.push(
+      runMode(rtEntries, 'realtime', async (partial, chunkEntries) => {
+        await store.mergeRealtimeToCache(partial, chunkEntries)
+      }).then(fetched => ({ mode: 'realtime' as const, fetched })),
+    )
 
     const results = await Promise.all(tasks)
     for (const { mode, fetched } of results) {
-      if (fetched.size > 0) {
-        if (mode === 'close') await store.mergeStockQuotesToCache(fetched, overseasMissing)
-        else await store.mergeRealtimeToCache(fetched, overseasAll)
+      if (mode === 'close' && fetched.size > 0) {
+        await store.mergeStockQuotesToCache(fetched, overseasMissing)
       }
 
       if (mode === 'close' && fetched.size < overseasMissing.length) hadMissing = true
@@ -184,6 +196,7 @@ async function resolveSymbols(entries: StockEntry[]): Promise<Map<string, { symb
 async function runMode(
   entries: Array<{ e: StockEntry; sym: { symbol: string; market: StockMarket } }>,
   mode: 'close' | 'realtime',
+  onChunk?: (partial: Map<string, StockQuoteInfo>, entries: StockEntry[]) => Promise<void>,
 ): Promise<Map<string, StockQuoteInfo>> {
   const result = new Map<string, StockQuoteInfo>()
   if (entries.length === 0) return result
@@ -191,56 +204,70 @@ async function runMode(
   let fetchEntries = entries
   if (mode === 'realtime') {
     fetchEntries = []
+    const closedMap = new Map<string, StockQuoteInfo>()
+    const closedEntries: StockEntry[] = []
     for (const x of entries) {
       if (x.sym.market === 'US') { fetchEntries.push(x); continue }
       const tz = stockMarketToTz(x.sym.market)
       const td = resolveMarketTradingDays(tz)
       if (td.isNonTradingDay || !td.hasOpened) {
         const { code } = normalizeStockCodeTencent(x.e.stockCode)
-        result.set(code, {
+        const info: StockQuoteInfo = {
           changeRate: null, date: null, market: x.sym.market,
           source: null, closed: true, updatedAt: Date.now(),
-        })
+        }
+        result.set(code, info)
+        closedMap.set(code, info)
+        closedEntries.push(x.e)
       } else {
         fetchEntries.push(x)
       }
     }
+    if (onChunk && closedMap.size > 0) await onChunk(closedMap, closedEntries)
     if (fetchEntries.length === 0) return result
   }
 
   await acquireSlot(mode)
   try {
-    const batch = fetchEntries.map(x => ({
-      symbol: x.sym.symbol,
-      market: stockMarketToTz(x.sym.market) as MarketTz,
-      mode,
-    }))
-    const fetched = await workerManager.request<typeof batch, Map<string, YahooQuoteResult>>(
-      WORKER_NAMES.FUND_YAHOO, 'yahoo-quote-batch', batch, FUND_LOOP_CONFIG.WORKER_TIMEOUT,
-    )
-    let nullCnt = 0
-    for (const x of fetchEntries) {
-      const { code } = normalizeStockCodeTencent(x.e.stockCode)
-      const r = fetched.get(x.sym.symbol)
-      if (r && r.rate != null) {
-        const date = r.date ?? (mode === 'realtime' ? resolveMarketTradingDays(stockMarketToTz(x.sym.market)).currentTradingDay : null)
-        result.set(code, {
-          changeRate: r.rate,
-          date,
-          market: x.sym.market,
-          source: r.source ?? 'Yahoo',
-          session: r.session,
-          updatedAt: mode === 'realtime' ? Date.now() : undefined,
-        })
-        if (mode === 'realtime') failedCodes.delete(code)
-      } else {
-        nullCnt++
-        if (mode === 'realtime') failedCodes.add(code)
+    const CHUNK = mode === 'realtime' ? 8 : fetchEntries.length
+    for (let i = 0; i < fetchEntries.length; i += CHUNK) {
+      const slice = fetchEntries.slice(i, i + CHUNK)
+      const batch = slice.map(x => ({
+        symbol: x.sym.symbol,
+        market: stockMarketToTz(x.sym.market) as MarketTz,
+        mode,
+      }))
+      const fetched = await workerManager.request<typeof batch, Map<string, YahooQuoteResult>>(
+        WORKER_NAMES.FUND_YAHOO, 'yahoo-quote-batch', batch, FUND_LOOP_CONFIG.WORKER_TIMEOUT,
+      )
+      let nullCnt = 0
+      const chunkResult = new Map<string, StockQuoteInfo>()
+      for (const x of slice) {
+        const { code } = normalizeStockCodeTencent(x.e.stockCode)
+        const r = fetched.get(x.sym.symbol)
+        if (r && r.rate != null) {
+          const date = r.date ?? (mode === 'realtime' ? resolveMarketTradingDays(stockMarketToTz(x.sym.market)).currentTradingDay : null)
+          const info: StockQuoteInfo = {
+            changeRate: r.rate,
+            date,
+            market: x.sym.market,
+            source: r.source ?? 'Yahoo',
+            session: r.session,
+            updatedAt: mode === 'realtime' ? Date.now() : undefined,
+          }
+          result.set(code, info)
+          chunkResult.set(code, info)
+          if (mode === 'realtime') failedCodes.delete(code)
+        } else {
+          nullCnt++
+          if (mode === 'realtime') failedCodes.add(code)
+        }
       }
-    }
-    if (nullCnt) {
-      // eslint-disable-next-line no-console
-      console.warn(`[yahoo] ${mode}取数失败 ${nullCnt}/${entries.length}（多为代理波动，loop 会接力重试）`)
+      if (nullCnt) {
+        // eslint-disable-next-line no-console
+        console.warn(`[yahoo] ${mode}取数失败 ${nullCnt}/${slice.length}（多为代理波动，loop 会接力重试）`)
+      }
+      if (onChunk && chunkResult.size > 0) await onChunk(chunkResult, slice.map(x => x.e))
     }
   } finally {
     releaseSlot(mode)

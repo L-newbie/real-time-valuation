@@ -14,6 +14,7 @@ interface DanjuanStock {
 interface DanjuanDetail {
   data?: {
     stock_list?: DanjuanStock[]
+    source?: string
     fund_position?: {
       stock_list?: DanjuanStock[]
       position_date?: string
@@ -78,8 +79,33 @@ export async function fetchDanjuanRatios(fundCode: string): Promise<Map<string, 
 
 const DANJUAN_TIMEOUT = 3500
 
+function parseStockList(stocks: DanjuanStock[]): HoldingDetailItem[] {
+  const holdings: HoldingDetailItem[] = []
+  for (const s of stocks) {
+    const code = String(s.code || '').trim()
+    const name = String(s.name || '').trim()
+    if (!code && !name) continue
+    holdings.push({
+      stockCode: code,
+      stockName: name,
+      ratio: parsePercent(s.percent_double ?? s.percent),
+      emMarketCode: emMarketFromXqSymbol(s.xq_symbol),
+      rawEntry: code,
+    })
+  }
+  return holdings
+}
+
 export async function fetchDanjuanHoldings(fundCode: string): Promise<HoldingDetailItem[] | null> {
   if (!isValidFundCode(fundCode)) return null
+
+  const assetUrl = `https://danjuanfunds.com/djapi/fundx/base/fund/record/asset/percent?fund_code=${fundCode}`
+  const assetJson = await fetchViaProxy(assetUrl, DANJUAN_TIMEOUT)
+  const assetData = (assetJson as DanjuanDetail)?.data
+  if (Array.isArray(assetData?.stock_list) && assetData.stock_list.length > 0) {
+    const holdings = parseStockList(assetData.stock_list)
+    if (holdings.length > 0) return holdings
+  }
 
   const url = `https://danjuanfunds.com/djapi/fund/detail/${fundCode}`
   const json = await fetchViaProxy(url, DANJUAN_TIMEOUT)
@@ -89,18 +115,6 @@ export async function fetchDanjuanHoldings(fundCode: string): Promise<HoldingDet
   const stocks = data?.stock_list ?? data?.fund_position?.stock_list
   if (!Array.isArray(stocks) || stocks.length === 0) return null
 
-  const holdings: HoldingDetailItem[] = []
-  for (const s of stocks) {
-    const code = String(s.code || '').trim()
-    if (!code) continue
-    holdings.push({
-      stockCode: code,
-      stockName: String(s.name || '').trim(),
-      ratio: parsePercent(s.percent_double ?? s.percent),
-      emMarketCode: emMarketFromXqSymbol(s.xq_symbol),
-      rawEntry: code,
-    })
-  }
-
+  const holdings = parseStockList(stocks)
   return holdings.length > 0 ? holdings : null
 }
