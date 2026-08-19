@@ -5,7 +5,8 @@ import type { StockQuoteInfo } from '@/shared/types/common-types'
 import { isValidFundCode } from '@/shared/utils/validation'
 import { fetchTop10FromMobileApi } from './f10-mobile-fetch'
 import { fetchTop10FromPingzhong, enrichMarketCodeFromPingzhong, enrichNamesFromFundSharesPositions, loadPingzhongHoldings, type PingzhongPreloaded } from './pingzhong-holdings-fetch'
-import { fetchDanjuanRatios } from './danjuan-holdings-fetch'
+import { fetchDanjuanHoldings } from './danjuan-holdings-fetch'
+import { lookupMappedCode, rememberMappedCode } from './stock-code-map'
 import { loadPingzhong } from '@/shared/net/pingzhong-loader'
 
 export type FetchStockQuotes = (
@@ -22,15 +23,114 @@ async function loadPingzhongRaw(fundCode: string): Promise<unknown> {
   return g?.Data_fundSharesPositions ?? null
 }
 
-function fillRatiosFromMap(holdings: FundAllHoldings['holdings'], ratios: Map<string, number>): boolean {
-  let changed = false
-  for (const h of holdings) {
-    if (h.ratio > 0) continue
-    const key = h.stockCode.toUpperCase()
-    let r = ratios.get(key)
-    if (r == null && /^\d+$/.test(key)) r = ratios.get(String(parseInt(key, 10)))
-    if (r != null && r > 0) { h.ratio = r; changed = true }
+const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{9}\d$/
+
+const CN_SUFFIX = /股份有限公司|有限责任公司|有限公司|控股公司|集团公司|株式会社|公司|控股|集团|\/特拉华州|\/DE/g
+
+const EN_SUFFIX = /(CORPORATION|CORP|INC|LTD|PLC|COMPANY|LIMITED|HOLDINGS?|GROUP|CO)+$/
+
+function normCn(s: string): string {
+  return String(s ?? '').replace(/[\s（）()]/g, '').replace(CN_SUFFIX, '').toUpperCase()
+}
+
+function normEn(s: string): string {
+  return String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(EN_SUFFIX, '')
+}
+
+function codeVariants(raw: string): string[] {
+  const c = String(raw ?? '').trim().toUpperCase()
+  if (!c) return []
+  const out = [c]
+
+  if (ISIN_RE.test(c)) {
+    const body = c.slice(2, 11)
+    const digits = body.replace(/\D/g, '')
+    if (digits.length >= 6) out.push(digits.slice(0, 6), digits.slice(-6), digits.slice(1, 7))
+    const alpha = body.replace(/[^A-Z]/g, '')
+    if (alpha.length >= 2) out.push(alpha)
   }
+
+  if (/^\d+$/.test(c)) {
+    out.push(String(parseInt(c, 10)))
+    if (c.length < 6) out.push(c.padStart(6, '0'))
+  }
+
+  const dot = c.indexOf('.')
+  if (dot > 0) out.push(c.slice(0, dot), c.slice(dot + 1))
+
+  const ex = new Set(out.filter(Boolean))
+  for (const v of Array.from(ex)) {
+    if (/^\d+$/.test(v)) {
+      ex.add(String(parseInt(v, 10)))
+      if (v.length < 6) ex.add(v.padStart(6, '0'))
+    }
+  }
+  return Array.from(ex)
+}
+
+type RatioDonor = { stockCode: string; stockName: string; ratio: number; emMarketCode?: string }
+
+function fillRatiosByRounds(
+  holdings: FundAllHoldings['holdings'],
+  donors: RatioDonor[],
+): boolean {
+  const pending = holdings.filter(h => !(h.ratio > 0))
+  const pool = donors.filter(d => d.ratio > 0)
+  if (pending.length === 0 || pool.length === 0) return false
+
+  const taken = new Set<number>()
+  let changed = false
+
+  const apply = (h: FundAllHoldings['holdings'][number], i: number): void => {
+    const d = pool[i]
+    taken.add(i)
+    h.ratio = d.ratio
+    if (!h.emMarketCode && d.emMarketCode) h.emMarketCode = d.emMarketCode
+    if (!h.stockName && d.stockName) h.stockName = d.stockName
+    changed = true
+  }
+
+  const round = (test: (h: FundAllHoldings['holdings'][number], d: RatioDonor) => boolean): void => {
+    for (const h of pending) {
+      if (h.ratio > 0) continue
+      for (let i = 0; i < pool.length; i++) {
+        if (taken.has(i)) continue
+        if (test(h, pool[i])) { apply(h, i); break }
+      }
+    }
+  }
+
+  round((h, d) => h.stockCode.trim().toUpperCase() === d.stockCode.trim().toUpperCase())
+
+  round((h, d) => {
+    const cached = lookupMappedCode(d.stockCode, d.stockName)
+    if (!cached) return false
+    const hv = codeVariants(h.stockCode)
+    return hv.includes(cached.code) || h.stockCode.trim().toUpperCase() === cached.code
+  })
+
+  round((h, d) => {
+    const hv = codeVariants(h.stockCode)
+    if (hv.length === 0 || !codeVariants(d.stockCode).some(x => hv.includes(x))) return false
+    rememberMappedCode(h.stockCode, 'variant', [d.stockCode, d.stockName], h.emMarketCode || d.emMarketCode)
+    return true
+  })
+
+  round((h, d) => {
+    const a = normCn(h.stockName)
+    if (a.length === 0 || a !== normCn(d.stockName)) return false
+    rememberMappedCode(h.stockCode, 'cn-name', [d.stockCode, d.stockName], h.emMarketCode || d.emMarketCode)
+    return true
+  })
+
+  round((h, d) => {
+    const a = normEn(h.stockName)
+    const b = normEn(d.stockName)
+    if (a.length < 4 || a !== b) return false
+    rememberMappedCode(h.stockCode, 'en-name', [d.stockCode, d.stockName], h.emMarketCode || d.emMarketCode)
+    return true
+  })
+
   return changed
 }
 
@@ -71,7 +171,7 @@ export async function fetchEstimatedHoldings(
     if (preloaded?.fundSharesPositions != null) {
       enrichNamesFromFundSharesPositions(top10.holdings, preloaded.fundSharesPositions, 'override')
     }
-    if (!top10.holdings.some(h => h.ratio > 0)) {
+    if (top10.holdings.some(h => !(h.ratio > 0))) {
       const prev = holdingsEnrichedReady
       let resolveFill: () => void = () => {}
       holdingsEnrichedReady = new Promise<void>((r) => { resolveFill = r })
@@ -82,9 +182,9 @@ export async function fetchEstimatedHoldings(
           if (g) enrichNamesFromFundSharesPositions(top10!.holdings, g, 'override')
         } catch {  }
         try {
-          if (!top10!.holdings.some(h => h.ratio > 0)) {
-            const ratios = await fetchDanjuanRatios(fundCode)
-            if (ratios) fillRatiosFromMap(top10!.holdings, ratios)
+          if (top10!.holdings.some(h => !(h.ratio > 0))) {
+            const dj = await fetchDanjuanHoldings(fundCode)
+            if (dj) fillRatiosByRounds(top10!.holdings, dj)
           }
         } catch {  }
         resolveFill()
