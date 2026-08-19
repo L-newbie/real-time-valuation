@@ -325,8 +325,7 @@ export const useFundStore = defineStore('fund', () => {
     const tz = stockMarketToTz(info.market)
 
     if (tz === 'unknown') return false
-    const td = resolveMarketTradingDays(tz)
-    return !!info.date && (info.date === td.currentTradingDay || info.date === td.lastClosedDay)
+    return !!info.date && info.date === resolveMarketTradingDays(tz).currentTradingDay
   }
 
   function getRealtimeCacheDay(): string {
