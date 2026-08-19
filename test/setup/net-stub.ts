@@ -224,7 +224,12 @@ function matchSample(url: string): unknown {
   if (u.includes('fundarchivesdatas')) return SAMPLE_F10
   if (u.includes('pingzhongdata')) return SAMPLE_PINGZHONG
   if (u.includes('danjuanfunds') || u.includes('djapi')) return SAMPLE_DANJUAN
-  if (u.includes('fundmobapi')) return { Datas: { fundStocks: [{ GPDM: '600519', GPJC: '贵州茅台', JZBL: '8.50' }] }, ErrCode: 0 }
+  if (u.includes('fundmobapi')) return {
+    Success: true,
+    ErrCode: 0,
+    Expansion: '2026-06-30',
+    Datas: { fundStocks: [{ GPDM: '600519', GPJC: '贵州茅台', JZBL: '8.50' }] },
+  }
   if (u.includes('searchapi.eastmoney')) return SAMPLE_STOCK_SEARCH
   if (u.includes('push2his') || u.includes('kline')) return SAMPLE_EM_KLINE
   if (u.includes('bk') || u.includes('sector')) return SAMPLE_SECTOR
