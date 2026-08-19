@@ -220,10 +220,11 @@ describe('16 · 取数容错', () => {
     t.check('占比 Map 非空', (ratios?.size ?? 0) > 0, '占比 Map 为空')
   })
 
-  featureCase('16-23', '持仓主链路：蛋卷优先且产出带占比', async t => {
+  featureCase('16-23', '持仓主链路：手机端优先且产出带占比', async t => {
     const m = await t.act('导入推算持仓模块', async () => await import('@/modules/fund/holdings/estimated-holdings'))
     const est = await t.act('取 000001 推算持仓', () => m.fetchEstimatedHoldings('000001'))
-    t.check('取到持仓', !!est && est.holdings.length > 0, '推算持仓为空')
+    t.check('取到持仓', !!est && est.holdings.length > 0,
+      '推算持仓为空 —— 手机端需 Success=true 且报告期在 15 个月内，缺任一项都会返回 null')
     t.check('有占比', (est?.holdings ?? []).some(h => h.ratio > 0),
       '持仓全部零占比 —— 无法加权推算估值，界面会显示「无占比」')
     t.check('描述不含「无占比」', !String(est?.description).includes('无占比'),
