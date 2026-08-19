@@ -26,7 +26,7 @@ const HOST_BUDGET: Record<string, number> = {
   'qt.gtimg.cn': 4,
   'ifzq.gtimg.cn': 4,
   'query1.finance.yahoo.com': 2,
-  'api.allorigins.win': 4,
+  'api.allorigins.win': 2,
   'corsproxy.io': 4,
   'danjuanfunds.com': 3,
 }
