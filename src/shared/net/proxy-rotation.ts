@@ -94,7 +94,7 @@ export async function fetchWithProxyRotation(
   targetUrl: string,
   timeoutMs: number = 6000,
 ): Promise<{ data: any | null; proxyFailed: boolean }> {
-  const MAX_RETRY = 1
+  const MAX_RETRY = 2
   let lastReason = ''
   let attempted = false
 
