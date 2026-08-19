@@ -1,7 +1,6 @@
 import type { HoldingDetailItem } from '@/modules/fund/fund-types'
 import { isValidFundCode } from '@/shared/utils/validation'
 import { withBudget } from '@/shared/net/net-budget'
-import { F10_CONFIG } from '@/config/constants'
 
 interface DanjuanStock {
   code?: string
@@ -77,11 +76,13 @@ export async function fetchDanjuanRatios(fundCode: string): Promise<Map<string, 
   return map.size > 0 ? map : null
 }
 
+const DANJUAN_TIMEOUT = 3500
+
 export async function fetchDanjuanHoldings(fundCode: string): Promise<HoldingDetailItem[] | null> {
   if (!isValidFundCode(fundCode)) return null
 
   const url = `https://danjuanfunds.com/djapi/fund/detail/${fundCode}`
-  const json = await fetchViaProxy(url, F10_CONFIG.TIMEOUT)
+  const json = await fetchViaProxy(url, DANJUAN_TIMEOUT)
   if (!json) return null
 
   const data = (json as DanjuanDetail)?.data
