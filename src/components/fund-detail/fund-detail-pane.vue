@@ -326,7 +326,8 @@
         </template>
         <template v-else-if="activeTab === 'alloc'">
           <div v-if="detailLoading" class="dp-empty"><span class="animate-breathe">加载中...</span></div>
-          <template v-else-if="allocRows.length > 0">
+          <template v-else-if="allocRows.length > 0 || positionTrendOption || allocHistoryRows.length > 0">
+            <template v-if="allocRows.length > 0">
             <p class="dp-panel-cap">最新报告期资产配置，按占净值比例</p>
             <div class="ac-stack" role="img" aria-label="资产配置占比">
               <i v-for="a in allocRows" :key="a.category" :data-c="a.tone"
@@ -364,6 +365,31 @@
               仓位越高，净值随市场波动越大。数据来自最新定期报告，与当前实际持仓可能存在偏差。
               <template v-if="allocTotal < 95">披露合计不足 100%，未列明部分已归入「其他」。</template>
             </p>
+            </template>
+
+            <div v-if="positionTrendOption" class="pt-wrap">
+              <p class="dp-panel-cap">股票仓位测算走势</p>
+              <v-chart :option="positionTrendOption" autoresize class="pt-chart" />
+            </div>
+
+            <div v-if="allocHistoryRows.length > 1" class="ph-wrap">
+              <p class="dp-panel-cap">历年报告期配置</p>
+              <div v-for="row in allocHistoryRows" :key="row.period" class="ph-row">
+                <div class="ph-head">
+                  <span class="ph-period font-number">{{ row.period }}</span>
+                  <span v-if="row.netAsset != null" class="ph-net font-number">净资产 {{ row.netAsset.toFixed(2) }} 亿</span>
+                </div>
+                <div class="ph-stack">
+                  <i v-for="it in row.items" :key="it.name" :data-c="it.tone"
+                     :style="{ width: Math.max(it.value, 0) + '%' }" :title="`${it.name} ${it.value.toFixed(2)}%`" />
+                </div>
+                <div class="ph-legend">
+                  <span v-for="it in row.items" :key="it.name" class="ph-leg">
+                    <i :data-c="it.tone" />{{ it.name }} <b class="font-number">{{ it.value.toFixed(2) }}%</b>
+                  </span>
+                </div>
+              </div>
+            </div>
           </template>
           <p v-else class="dp-empty">暂无资产配置数据</p>
         </template>
@@ -409,31 +435,131 @@
         </template>
         <template v-else-if="activeTab === 'info'">
           <div v-if="detailLoading" class="dp-empty"><span class="animate-breathe">加载中...</span></div>
-          <div v-else-if="fundInfo" class="info-grid">
-            <div class="info-card"><span class="info-label">基金类型</span><span class="info-val">{{ fundInfo.fundType || '--' }}</span></div>
-            <div class="info-card"><span class="info-label">基金经理</span><span class="info-val">{{ fundInfo.fundManager || '--' }}</span></div>
-            <div class="info-card"><span class="info-label">同类排名</span><span class="info-val">{{ fundInfo.peerRanking || '--' }}</span></div>
-            <div class="info-card"><span class="info-label">净值更新</span><span class="info-val font-number">{{ fundInfo.dayGrowthDate || '--' }}</span></div>
-            <div class="info-card"><span class="info-label">成立日期</span><span class="info-val font-number">{{ baseInfo?.establishDate || fundInfo.establishDate || '--' }}</span></div>
-            <div v-if="baseInfo?.company" class="info-card"><span class="info-label">基金公司</span><span class="info-val">{{ baseInfo.company }}</span></div>
-            <div v-if="baseInfo?.riskLevel" class="info-card"><span class="info-label">风险等级</span><span class="info-val">{{ baseInfo.riskLevel }}</span></div>
-            <div v-if="baseInfo?.confirmDays" class="info-card"><span class="info-label">确认天数</span><span class="info-val font-number">T+{{ baseInfo.confirmDays }}</span></div>
-            <div class="info-card"><span class="info-label">基金规模</span><span class="info-val">{{ fundInfo.fundScale || '--' }}</span></div>
-            <div class="info-card"><span class="info-label">申购费率</span><span class="info-val">{{ fundInfo.purchaseRate ? fundInfo.purchaseRate + '%' : '--' }}</span></div>
-            <div class="info-card"><span class="info-label">最低申购</span><span class="info-val">{{ fundInfo.minPurchase ? fundInfo.minPurchase + '元' : '--' }}</span></div>
-            <div class="info-card"><span class="info-label">申购状态</span><span :class="['info-val', fundInfo.purchaseStatus === '开放' ? 'text-rise' : 'text-fall']">{{ fundInfo.purchaseStatus || '--' }}</span></div>
-            <div class="info-card"><span class="info-label">赎回状态</span><span :class="['info-val', fundInfo.redeemStatus === '开放' ? 'text-rise' : 'text-fall']">{{ fundInfo.redeemStatus || '--' }}</span></div>
-          </div>
+          <template v-else-if="fundInfo">
+            <div class="info-grid">
+              <div class="info-card"><span class="info-label">基金类型</span><span class="info-val">{{ fundInfo.fundType || '--' }}</span></div>
+              <div class="info-card"><span class="info-label">基金经理</span><span class="info-val">{{ fundInfo.fundManager || '--' }}</span></div>
+              <div class="info-card">
+                <span class="info-label">同类排名</span>
+                <span class="info-val font-number">{{ fundInfo.peerRanking || '--' }}</span>
+              </div>
+              <div class="info-card"><span class="info-label">净值更新</span><span class="info-val font-number">{{ fundInfo.dayGrowthDate || '--' }}</span></div>
+              <div class="info-card"><span class="info-label">成立日期</span><span class="info-val font-number">{{ baseInfo?.establishDate || fundInfo.establishDate || '--' }}</span></div>
+              <div v-if="baseInfo?.company" class="info-card"><span class="info-label">基金公司</span><span class="info-val">{{ baseInfo.company }}</span></div>
+              <div v-if="baseInfo?.riskLevel" class="info-card"><span class="info-label">风险等级</span><span class="info-val">{{ baseInfo.riskLevel }}</span></div>
+              <div v-if="baseInfo?.confirmDays" class="info-card"><span class="info-label">确认天数</span><span class="info-val font-number">T+{{ baseInfo.confirmDays }}</span></div>
+              <div class="info-card"><span class="info-label">基金规模</span><span class="info-val font-number">{{ fundInfo.fundScale || '--' }}</span></div>
+              <div class="info-card"><span class="info-label">申购费率</span><span class="info-val">{{ fundInfo.purchaseRate ? fundInfo.purchaseRate + '%' : '--' }}</span></div>
+              <div class="info-card"><span class="info-label">最低申购</span><span class="info-val">{{ fundInfo.minPurchase ? fundInfo.minPurchase + '元' : '--' }}</span></div>
+              <div class="info-card"><span class="info-label">申购状态</span><span :class="['info-val', fundInfo.purchaseStatus === '开放' ? 'text-rise' : 'text-fall']">{{ fundInfo.purchaseStatus || '--' }}</span></div>
+              <div class="info-card"><span class="info-label">赎回状态</span><span :class="['info-val', fundInfo.redeemStatus === '开放' ? 'text-rise' : 'text-fall']">{{ fundInfo.redeemStatus || '--' }}</span></div>
+            </div>
+
+            <div v-if="managers.length > 0" class="mg-wrap">
+              <p class="dp-panel-cap">现任基金经理 · {{ managers.length }} 位</p>
+              <div v-for="(m, mi) in managers" :key="m.name" class="mg-card">
+                <div class="mg-head">
+                  <span class="mg-name">{{ m.name }}</span>
+                  <span v-if="m.star > 0" class="mg-star" :title="`${m.star} 星`">
+                    <i v-for="s in 5" :key="s" :class="['mg-star-i', s <= m.star && 'is-on']">★</i>
+                  </span>
+                  <span v-if="m.powerAvg > 0" class="mg-avg font-number">综合 {{ m.powerAvg.toFixed(1) }}</span>
+                </div>
+                <div class="mg-meta">
+                  <span v-if="m.workTime">从业 {{ m.workTime }}</span>
+                  <span v-if="m.fundSize">管理 {{ m.fundSize }}</span>
+                </div>
+                <div v-if="managerRadarOptions[mi]" class="mg-radar">
+                  <v-chart :option="managerRadarOptions[mi]" autoresize class="mg-radar-c" />
+                </div>
+                <div v-else-if="m.power.length > 0" class="mg-bars">
+                  <div v-for="p in m.power" :key="p.label" class="alloc-item">
+                    <div class="alloc-bar-row">
+                      <span class="alloc-label">{{ p.label }}</span>
+                      <span class="alloc-val font-number">{{ p.value.toFixed(1) }}</span>
+                    </div>
+                    <div class="alloc-bar-bg"><div class="alloc-bar-fill" :style="{ width: Math.min(p.value, 100) + '%' }"></div></div>
+                  </div>
+                </div>
+                <div v-if="m.tenureReturn != null" class="mg-profit">
+                  <div class="mg-profit-cell">
+                    <em>任期收益</em>
+                    <b :class="['font-number', m.tenureReturn > 0 ? 'text-rise' : m.tenureReturn < 0 ? 'text-fall' : '']">
+                      {{ m.tenureReturn > 0 ? '+' : '' }}{{ m.tenureReturn.toFixed(2) }}%
+                    </b>
+                  </div>
+                  <div v-if="m.peerReturn != null" class="mg-profit-cell">
+                    <em>同类平均</em>
+                    <b class="font-number text-muted">{{ m.peerReturn > 0 ? '+' : '' }}{{ m.peerReturn.toFixed(2) }}%</b>
+                  </div>
+                  <div v-if="m.peerReturn != null" class="mg-profit-cell">
+                    <em>超额</em>
+                    <b :class="['font-number', m.tenureReturn - m.peerReturn > 0 ? 'text-rise' : 'text-fall']">
+                      {{ m.tenureReturn - m.peerReturn > 0 ? '+' : '' }}{{ (m.tenureReturn - m.peerReturn).toFixed(2) }}%
+                    </b>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
           <p v-else class="dp-empty">暂无详情数据</p>
         </template>
         <template v-else>
-          <template v-if="fundInfo && fundInfo.holderStructure && fundInfo.holderStructure.length > 0">
-            <div v-for="item in fundInfo.holderStructure" :key="item.holderType" class="alloc-item">
-              <div class="alloc-bar-row">
-                <span class="alloc-label">{{ item.holderType }}</span>
-                <span class="alloc-val font-number">{{ item.ratio.toFixed(2) }}%</span>
+          <div v-if="detailLoading" class="dp-empty"><span class="animate-breathe">加载中...</span></div>
+          <template v-else-if="(fundInfo?.holderStructure?.length ?? 0) > 0 || scaleRows.length > 0 || buySedemptionRows.length > 0">
+            <template v-if="(fundInfo?.holderStructure?.length ?? 0) > 0">
+              <p class="dp-panel-cap">最新报告期持有人结构</p>
+              <div v-for="item in fundInfo!.holderStructure" :key="item.holderType" class="alloc-item">
+                <div class="alloc-bar-row">
+                  <span class="alloc-label">{{ item.holderType }}</span>
+                  <span class="alloc-val font-number">{{ item.ratio.toFixed(2) }}%</span>
+                </div>
+                <div class="alloc-bar-bg"><div class="alloc-bar-fill" :style="{ width: Math.min(item.ratio, 100) + '%' }"></div></div>
               </div>
-              <div class="alloc-bar-bg"><div class="alloc-bar-fill" :style="{ width: Math.min(item.ratio, 100) + '%' }"></div></div>
+            </template>
+
+            <div v-if="holderHistoryRows.length > 1" class="ph-wrap">
+              <p class="dp-panel-cap">历年报告期结构变化</p>
+              <div v-for="row in holderHistoryRows" :key="row.period" class="ph-row">
+                <div class="ph-head"><span class="ph-period font-number">{{ row.period }}</span></div>
+                <div class="ph-stack">
+                  <i v-for="(it, i) in row.items" :key="it.name" :data-h="i"
+                     :style="{ width: Math.max(it.value, 0) + '%' }" :title="`${it.name} ${it.value.toFixed(2)}%`" />
+                </div>
+                <div class="ph-legend">
+                  <span v-for="(it, i) in row.items" :key="it.name" class="ph-leg">
+                    <i :data-h="i" />{{ it.name }} <b class="font-number">{{ it.value.toFixed(2) }}%</b>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="scaleRows.length > 0" class="sc-wrap">
+              <p class="dp-panel-cap">基金规模变动 · 单位亿元</p>
+              <div v-for="s in scaleRows" :key="s.period" class="sc-row">
+                <span class="sc-period font-number">{{ s.period }}</span>
+                <span class="sc-bar"><i :style="{ width: (scaleMax > 0 ? (s.scale / scaleMax * 100) : 0) + '%' }" /></span>
+                <span class="sc-val font-number">{{ s.scale.toFixed(2) }}</span>
+                <span v-if="s.momValue != null"
+                      :class="['sc-mom font-number', s.momValue > 0 ? 'text-rise' : s.momValue < 0 ? 'text-fall' : 'text-muted']">
+                  {{ s.momValue > 0 ? '+' : '' }}{{ s.mom }}
+                </span>
+                <span v-else class="sc-mom text-muted">--</span>
+              </div>
+            </div>
+
+            <div v-if="buySedemptionRows.length > 0" class="bs-wrap">
+              <p class="dp-panel-cap">申购赎回 · 单位亿份</p>
+              <div class="bs-table">
+                <div class="bs-head">
+                  <span>报告期</span>
+                  <span v-for="s in buySedemptionRows[0].items" :key="s.name">{{ s.name }}</span>
+                </div>
+                <div v-for="row in buySedemptionRows" :key="row.period" class="bs-row">
+                  <span class="font-number">{{ row.period }}</span>
+                  <span v-for="it in row.items" :key="it.name" class="font-number">{{ it.value.toFixed(2) }}</span>
+                </div>
+              </div>
             </div>
           </template>
           <p v-else class="dp-empty">暂无持有人结构数据</p>
@@ -510,8 +636,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
-import { LineChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, DataZoomComponent, MarkLineComponent, MarkPointComponent } from 'echarts/components'
+import { LineChart, RadarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, DataZoomComponent, MarkLineComponent, MarkPointComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useFundStore } from '@/modules/fund/fund-store'
 import { useHoldingStore } from '@/modules/holding/holding-store'
@@ -543,7 +669,7 @@ import { computeEstimatedGszzlFromPrevDay } from '@/modules/fund/calc/gszzl-weig
 import { EM_MARKET_LABEL } from '@/shared/market/em-market-map'
 import type { StockQuoteInfo } from '@/shared/types/common-types'
 
-use([LineChart, GridComponent, TooltipComponent, DataZoomComponent, MarkLineComponent, MarkPointComponent, CanvasRenderer])
+use([LineChart, RadarChart, GridComponent, TooltipComponent, DataZoomComponent, MarkLineComponent, MarkPointComponent, LegendComponent, CanvasRenderer])
 
 const props = defineProps<{ fundCode: string; isActive?: boolean }>()
 const router = useRouter()
@@ -1345,6 +1471,143 @@ const allocOther = computed(() => Math.max(100 - allocTotal.value, 0))
 const stockPosition = computed(() => {
   const hit = allocRows.value.find(a => a.tone === 'stock')
   return hit ? hit.ratio : null
+})
+
+const chartPalette = () => {
+  const style = getComputedStyle(document.documentElement)
+  return {
+    axis: style.getPropertyValue('--text-muted').trim() || '#8a97a0',
+    split: style.getPropertyValue('--border-default').trim() || 'rgba(210,224,232,0.10)',
+    tipBg: style.getPropertyValue('--bg-card').trim() || '#161c21',
+    tipText: style.getPropertyValue('--text-primary').trim() || '#f5f7f8',
+    primary: style.getPropertyValue('--color-primary').trim() || '#ff8a3d',
+  }
+}
+
+const managers = computed(() => fundInfo.value?.managers ?? [])
+
+const managerRadarOptions = computed(() => {
+  const c = chartPalette()
+  return managers.value.map((m) => {
+    if (m.power.length < 3) return null
+    return {
+      backgroundColor: 'transparent',
+      tooltip: {
+        backgroundColor: c.tipBg,
+        borderColor: c.split,
+        textStyle: { color: c.tipText, fontSize: 11 },
+      },
+      radar: {
+        indicator: m.power.map(p => ({ name: p.label, max: 100 })),
+        radius: '66%',
+        center: ['50%', '54%'],
+        axisName: { color: c.axis, fontSize: 10 },
+        splitLine: { lineStyle: { color: c.split } },
+        axisLine: { lineStyle: { color: c.split } },
+        splitArea: { show: false },
+      },
+      series: [{
+        type: 'radar',
+        symbolSize: 3,
+        data: [{
+          value: m.power.map(p => p.value),
+          name: m.name,
+          lineStyle: { color: c.primary, width: 1.5 },
+          itemStyle: { color: c.primary },
+          areaStyle: { color: c.primary, opacity: 0.18 },
+        }],
+      }],
+    }
+  })
+})
+
+const positionTrendOption = computed(() => {
+  const pts = fundInfo.value?.positionTrend ?? []
+  if (pts.length < 2) return null
+  const c = chartPalette()
+  return {
+    backgroundColor: 'transparent',
+    grid: { left: 42, right: 14, top: 16, bottom: 30 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: c.tipBg,
+      borderColor: c.split,
+      textStyle: { color: c.tipText, fontSize: 11 },
+      valueFormatter: (v: number) => `${Number(v).toFixed(2)}%`,
+    },
+    xAxis: {
+      type: 'category',
+      data: pts.map((p) => {
+        const d = new Date(p[0])
+        return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      }),
+      axisLine: { lineStyle: { color: c.split } },
+      axisLabel: { color: c.axis, fontSize: 10 },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      axisLabel: { color: c.axis, fontSize: 10, formatter: '{value}%' },
+      splitLine: { lineStyle: { color: c.split } },
+    },
+    series: [{
+      type: 'line',
+      data: pts.map(p => p[1]),
+      smooth: true,
+      showSymbol: false,
+      lineStyle: { color: c.primary, width: 1.6 },
+      areaStyle: { color: c.primary, opacity: 0.12 },
+    }],
+  }
+})
+
+function periodRows(ps: { categories: string[]; series: { name: string; values: number[] }[] } | null | undefined) {
+  if (!ps || ps.series.length === 0) return []
+  return ps.categories.map((period, i) => ({
+    period,
+    items: ps.series
+      .map(s => ({ name: s.name, value: s.values[i] }))
+      .filter(x => Number.isFinite(x.value)),
+  })).filter(r => r.items.length > 0).reverse()
+}
+
+const allocHistoryRows = computed(() => {
+  const rows = periodRows(fundInfo.value?.assetAllocHistory)
+  return rows.map(r => ({
+    period: r.period,
+    items: r.items
+      .filter(x => !x.name.includes('净资产'))
+      .map(x => ({ name: x.name.replace(/占净比$/, ''), value: x.value, tone: allocTone(x.name) })),
+    netAsset: r.items.find(x => x.name.includes('净资产'))?.value ?? null,
+  }))
+})
+
+const holderHistoryRows = computed(() => {
+  const rows = periodRows(fundInfo.value?.holderHistory)
+  return rows.map(r => ({
+    period: r.period,
+    items: r.items.map(x => ({ name: x.name.replace(/持有比例$/, ''), value: x.value })),
+  }))
+})
+
+const buySedemptionRows = computed(() => periodRows(fundInfo.value?.buySedemption))
+
+const scaleRows = computed(() => {
+  const list = fundInfo.value?.scaleHistory ?? []
+  return [...list].reverse().map(s => ({
+    period: s.period,
+    scale: s.scale,
+    mom: s.mom,
+    momValue: s.mom ? parseFloat(s.mom.replace('%', '')) : null,
+  }))
+})
+
+const scaleMax = computed(() => scaleRows.value.reduce((m, s) => Math.max(m, s.scale), 0))
+
+const peerRankLatest = computed(() => {
+  const list = fundInfo.value?.peerRankTrend ?? []
+  return list.length > 0 ? list[list.length - 1] : null
 })
 
 const baseInfo = ref<FundBaseInfo | null>(null)
@@ -2671,7 +2934,118 @@ watch(fundCode, (code) => {
   font-size: 11px; line-height: 1.65; color: var(--text-muted);
 }
 
+.mg-wrap { display: flex; flex-direction: column; gap: 8px; margin-top: var(--spacing-md); }
+.mg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 12px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+.mg-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mg-name { font-size: var(--font-sm); font-weight: 700; color: var(--text-primary); }
+.mg-star { display: inline-flex; gap: 1px; }
+.mg-star-i { font-size: 10px; color: var(--border-default); font-style: normal; }
+.mg-star-i.is-on { color: var(--color-accent, var(--color-primary)); }
+.mg-avg {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-glow);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.mg-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
+.mg-radar { height: 190px; }
+.mg-radar-c { width: 100%; height: 100%; }
+.mg-bars { display: flex; flex-direction: column; gap: 6px; }
+.mg-profit {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+.mg-profit-cell { display: flex; flex-direction: column; gap: 2px; }
+.mg-profit-cell em { font-style: normal; font-size: 10px; color: var(--text-muted); }
+.mg-profit-cell b { font-size: 12px; font-weight: 700; }
+
+.pt-wrap { margin-top: var(--spacing-md); }
+.pt-chart { width: 100%; height: 168px; }
+
+.ph-wrap { display: flex; flex-direction: column; gap: 10px; margin-top: var(--spacing-md); }
+.ph-row { display: flex; flex-direction: column; gap: 5px; }
+.ph-head { display: flex; align-items: baseline; gap: 8px; }
+.ph-period { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+.ph-net { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+.ph-stack {
+  display: flex;
+  height: 7px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+.ph-stack i { display: block; height: 100%; background: var(--text-muted); }
+.ph-stack i[data-c='stock'] { background: var(--color-primary); }
+.ph-stack i[data-c='bond'] { background: #06b6d4; }
+.ph-stack i[data-c='cash'] { background: #22c55e; }
+.ph-stack i[data-c='fof'] { background: #8b5cf6; }
+.ph-stack i[data-c='other'] { background: var(--text-muted); opacity: 0.5; }
+.ph-stack i[data-h='0'] { background: var(--color-primary); }
+.ph-stack i[data-h='1'] { background: #06b6d4; }
+.ph-stack i[data-h='2'] { background: #8b5cf6; }
+.ph-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 10px; color: var(--text-muted); }
+.ph-leg { display: inline-flex; align-items: center; gap: 4px; }
+.ph-leg i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+.ph-leg i[data-c='stock'] { background: var(--color-primary); }
+.ph-leg i[data-c='bond'] { background: #06b6d4; }
+.ph-leg i[data-c='cash'] { background: #22c55e; }
+.ph-leg i[data-c='fof'] { background: #8b5cf6; }
+.ph-leg i[data-h='0'] { background: var(--color-primary); }
+.ph-leg i[data-h='1'] { background: #06b6d4; }
+.ph-leg i[data-h='2'] { background: #8b5cf6; }
+.ph-leg b { color: var(--text-secondary); font-weight: 600; }
+
+.sc-wrap { display: flex; flex-direction: column; gap: 7px; margin-top: var(--spacing-md); }
+.sc-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) 56px 62px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.sc-period { color: var(--text-muted); }
+.sc-bar { height: 6px; border-radius: var(--radius-full); background: var(--bg-elevated); overflow: hidden; }
+.sc-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  border-radius: var(--radius-full);
+  transition: width var(--duration-normal) var(--ease-out-expo);
+}
+.sc-val { color: var(--text-secondary); text-align: right; font-weight: 600; }
+.sc-mom { text-align: right; font-size: 10px; }
+
+.bs-wrap { margin-top: var(--spacing-md); }
+.bs-table { display: flex; flex-direction: column; gap: 4px; }
+.bs-head, .bs-row {
+  display: grid;
+  grid-template-columns: 74px repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+.bs-head { color: var(--text-muted); font-size: 10px; padding-bottom: 4px; border-bottom: 1px solid var(--border-subtle); }
+.bs-head span:not(:first-child), .bs-row span:not(:first-child) { text-align: right; }
+.bs-row { color: var(--text-secondary); padding: 3px 0; }
+.bs-row span:first-child { color: var(--text-muted); }
+
 @media (max-width: 767px) {
+  .mg-radar { height: 168px; }
+  .sc-row { grid-template-columns: 62px minmax(0, 1fr) 48px 54px; gap: 6px; }
+  .bs-head, .bs-row { grid-template-columns: 62px repeat(3, minmax(0, 1fr)); gap: 4px; font-size: 10px; }
   .ac-item { grid-template-columns: 8px minmax(0, 1fr) 48px auto; gap: 6px; }
   .ac-sum-cell { padding: 7px 9px; }
   .detail-body { padding: 0 var(--spacing-sm) var(--spacing-sm); gap: var(--spacing-sm); }
