@@ -33,7 +33,7 @@ async function fetchYahooQuote(
   const range = mode === 'realtime' ? '1d' : '1mo'
   const targetUrl = `${API_URLS.YAHOO_CHART}/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&includePrePost=true`
 
-  const timeout = 3000
+  const timeout = mode === 'realtime' ? 3000 : 6000
   const { data, proxyFailed } = await fetchWithProxyRotation(targetUrl, timeout)
   if (proxyFailed || !data) {
     return { rate: null, date: null, proxyFailed }
