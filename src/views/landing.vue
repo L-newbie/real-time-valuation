@@ -282,8 +282,8 @@ const GROUPS = [
 ]
 
 const STATS = [
-  { value: '331', label: '测试用例全绿', short: '测试全绿' },
-  { value: '28', label: '功能域覆盖', short: '功能域' },
+  { value: '347', label: '测试用例全绿', short: '测试全绿' },
+  { value: '29', label: '功能域覆盖', short: '功能域' },
   { value: '0', label: '后端服务', short: '后端' },
 ]
 
