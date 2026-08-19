@@ -100,7 +100,7 @@ self.onmessage = async (e: MessageEvent<WorkerIncomingMessage>) => {
 
     const yahooEntries = entries.filter(e => !results.has(e.symbol))
 
-    const BATCH_CONCURRENCY = 4
+    const BATCH_CONCURRENCY = 6
     let idx = 0
     const size = Math.min(BATCH_CONCURRENCY, yahooEntries.length)
     const workers = Array.from({ length: size }, async () => {
