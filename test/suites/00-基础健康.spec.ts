@@ -185,7 +185,7 @@ describe('00 · 基础健康', () => {
     //  2) featureCase 静态调用数 —— 防止用例被逐条删除
     //     （注：01 页面/组件渲染用循环批量生成，静态数少于实际运行数，此处只卡静态written 的部分）
     const FILE_BASELINE = 12
-    const CASE_BASELINE = 212
+    const CASE_BASELINE = 219
 
     t.check(
       `测试文件数 ${files.length} 不低于基线 ${FILE_BASELINE}`,
@@ -207,6 +207,45 @@ describe('00 · 基础健康', () => {
       `用例数 ${count} 不低于基线 ${CASE_BASELINE}`,
       count >= CASE_BASELINE,
       `用例数从 ${CASE_BASELINE} 跌到 ${count} —— 有人删除了测试用例`,
+    )
+  })
+
+  featureCase('00-09', '落地页对外展示的数字不虚高', async t => {
+    const suiteDir = resolve(__dirname)
+    const files = await t.prepare('扫描 suites 目录', () =>
+      readdirSync(suiteDir).filter(f => f.endsWith('.spec.ts')),
+    )
+
+    // 静态统计只是下界：01 页面/组件渲染用循环批量生成用例，实际运行数会更多。
+    // 因此用例数只卡「不得低于静态下界」，功能域数则可精确比对。
+    const actual = await t.act('统计静态用例下界与功能域数', () => {
+      let caseFloor = 0
+      const domains = new Set<string>()
+      for (const f of files) {
+        const src = readFileSync(join(suiteDir, f), 'utf-8')
+        caseFloor += (src.match(/featureCase\(/g) ?? []).length
+        for (const m of src.matchAll(/describe\(\s*['"](\d+)\s*·/g)) domains.add(m[1])
+      }
+      return { caseFloor, domains: domains.size }
+    })
+
+    const landing = await t.act('读取落地页 STATS', () =>
+      readFileSync(join(SRC, 'views/landing.vue'), 'utf-8'),
+    )
+    const shownCases = Number(landing.match(/value:\s*'(\d+)',\s*label:\s*'测试用例全绿'/)?.[1] ?? 0)
+    const shownDomains = Number(landing.match(/value:\s*'(\d+)',\s*label:\s*'功能域覆盖'/)?.[1] ?? 0)
+
+    t.check('落地页能解析出两个数字', shownCases > 0 && shownDomains > 0,
+      `落地页 STATS 解析失败：用例数=${shownCases} 功能域=${shownDomains}`)
+    t.check(
+      `落地页功能域 ${shownDomains} 与实际 ${actual.domains} 一致`,
+      shownDomains === actual.domains,
+      `落地页写 ${shownDomains} 个功能域，实际 ${actual.domains} 个 —— 对外数字已过时`,
+    )
+    t.check(
+      `落地页用例数 ${shownCases} 不低于静态下界 ${actual.caseFloor}`,
+      shownCases >= actual.caseFloor,
+      `落地页写 ${shownCases} 条用例，但静态可数的已有 ${actual.caseFloor} 条 —— 对外数字已过时`,
     )
   })
 

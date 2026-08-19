@@ -17,7 +17,9 @@ export interface PingzhongData {
   Data_fundSharesPositions?: unknown
   Data_holderStructure?: unknown
   Data_rateInSimilarType?: unknown
+  Data_rateInSimilarPersent?: unknown
   Data_performanceEvaluation?: unknown
+  Data_buySedemption?: unknown
   stockCodesNew?: unknown
   stockCodes?: unknown
   zqCodesNew?: unknown
@@ -36,7 +38,7 @@ const SNAPSHOT_KEYS: readonly string[] = [
   'Data_netWorthTrend', 'Data_ACWorthTrend', 'Data_grandTotal',
   'Data_currentFundManager', 'Data_fluctuationScale', 'Data_assetAllocation',
   'Data_fundSharesPositions', 'Data_holderStructure', 'Data_rateInSimilarType',
-  'Data_performanceEvaluation',
+  'Data_rateInSimilarPersent', 'Data_performanceEvaluation', 'Data_buySedemption',
   'stockCodesNew', 'stockCodes', 'zqCodesNew', 'zqCodes',
   'syl_1n', 'syl_6y', 'syl_3y', 'syl_1y',
   'fund_Rate', 'fund_minsg', 'fund_sourceRate',

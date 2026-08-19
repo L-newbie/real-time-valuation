@@ -11,6 +11,24 @@ export interface AssetAllocationItem { category: string; ratio: number }
 export interface TopHoldingItem { stockCode: string; stockName: string; ratio: number; changeRate?: number | null }
 export interface HolderStructureItem { holderType: string; ratio: number }
 
+export interface PeriodSeriesItem { name: string; values: number[] }
+export interface PeriodSeries { categories: string[]; series: PeriodSeriesItem[] }
+
+export interface ManagerPowerItem { label: string; value: number }
+export interface FundManagerItem {
+  name: string
+  star: number
+  workTime: string
+  fundSize: string
+  powerAvg: number
+  power: ManagerPowerItem[]
+  tenureReturn: number | null
+  peerReturn: number | null
+}
+
+export interface ScalePoint { period: string; scale: number; mom: string }
+export interface RankPoint { date: string; rank: number; total: number }
+
 export interface FundFullInfo {
   fundCode: string
   fundName: string
@@ -28,6 +46,14 @@ export interface FundFullInfo {
   topHoldings: TopHoldingItem[]
   holderStructure: HolderStructureItem[]
   peerRanking: string
+
+  managers: FundManagerItem[]
+  assetAllocHistory: PeriodSeries | null
+  holderHistory: PeriodSeries | null
+  scaleHistory: ScalePoint[]
+  buySedemption: PeriodSeries | null
+  positionTrend: [number, number][]
+  peerRankTrend: RankPoint[]
 }
 
 interface NetWorthPoint { x: number; y: number | string }
@@ -35,6 +61,118 @@ interface NetWorthPoint { x: number; y: number | string }
 const FUND_TYPE_MAP: Record<string, string> = {
   '001': '股票型', '002': '混合型', '003': '债券型',
   '004': '指数型', '005': 'QDII', '006': 'FOF', '007': '货币型',
+}
+
+function parsePeriodSeries(raw: unknown): PeriodSeries | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const obj = raw as { categories?: unknown; series?: unknown }
+  const categories = Array.isArray(obj.categories) ? obj.categories.map(c => String(c ?? '')) : []
+  if (!Array.isArray(obj.series) || obj.series.length === 0) return null
+
+  const series: PeriodSeriesItem[] = []
+  for (const s of obj.series as Array<Record<string, unknown>>) {
+    const name = typeof s?.name === 'string' ? s.name : ''
+    if (!name || !Array.isArray(s?.data)) continue
+    const values = (s.data as unknown[]).map(v => safeParseFloat(v))
+    if (values.some(v => Number.isFinite(v))) series.push({ name, values })
+  }
+  if (series.length === 0) return null
+  return { categories, series }
+}
+
+function latestOfSeries(ps: PeriodSeries | null): { name: string; value: number }[] {
+  if (!ps) return []
+  const out: { name: string; value: number }[] = []
+  for (const s of ps.series) {
+    const idx = s.values.length - 1
+    if (idx < 0) continue
+    const value = s.values[idx]
+    if (Number.isFinite(value)) out.push({ name: s.name, value })
+  }
+  return out
+}
+
+function parseScaleHistory(raw: unknown): ScalePoint[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+  const obj = raw as { categories?: unknown; series?: unknown }
+  if (!Array.isArray(obj.series)) return []
+  const categories = Array.isArray(obj.categories) ? obj.categories.map(c => String(c ?? '')) : []
+  const out: ScalePoint[] = []
+  ;(obj.series as Array<Record<string, unknown>>).forEach((item, i) => {
+    const scale = safeParseFloat(item?.y)
+    if (!Number.isFinite(scale)) return
+    out.push({ period: categories[i] ?? '', scale, mom: typeof item?.mom === 'string' ? item.mom : '' })
+  })
+  return out
+}
+
+function parseManagers(raw: unknown): FundManagerItem[] {
+  if (!Array.isArray(raw)) return []
+  const out: FundManagerItem[] = []
+  for (const m of raw as Array<Record<string, any>>) {
+    const name = typeof m?.name === 'string' ? m.name : ''
+    if (!name) continue
+
+    const power: ManagerPowerItem[] = []
+    const pw = m?.power
+    if (pw && Array.isArray(pw.categories) && Array.isArray(pw.data)) {
+      pw.categories.forEach((label: unknown, i: number) => {
+        const value = safeParseFloat(pw.data[i])
+        if (label && Number.isFinite(value)) power.push({ label: String(label), value })
+      })
+    }
+
+    let tenureReturn: number | null = null
+    let peerReturn: number | null = null
+    const bars = m?.profit?.series?.[0]?.data
+    if (Array.isArray(bars)) {
+      const a = safeParseFloat(bars[0]?.y)
+      const b = safeParseFloat(bars[1]?.y)
+      if (Number.isFinite(a)) tenureReturn = a
+      if (Number.isFinite(b)) peerReturn = b
+    }
+
+    out.push({
+      name,
+      star: Math.max(0, Math.min(5, Math.round(safeParseFloat(m?.star)) || 0)),
+      workTime: typeof m?.workTime === 'string' ? m.workTime : '',
+      fundSize: typeof m?.fundSize === 'string' ? m.fundSize : '',
+      powerAvg: safeParseFloat(pw?.avr),
+      power,
+      tenureReturn,
+      peerReturn,
+    })
+  }
+  return out
+}
+
+function parsePositionTrend(raw: unknown): [number, number][] {
+  if (!Array.isArray(raw)) return []
+  const out: [number, number][] = []
+  for (const p of raw) {
+    if (!Array.isArray(p) || p.length < 2) continue
+    const t = safeParseFloat(p[0])
+    const v = safeParseFloat(p[1])
+    if (Number.isFinite(t) && Number.isFinite(v) && t > 0) out.push([t, v])
+  }
+  return out
+}
+
+function parsePeerRankTrend(raw: unknown): RankPoint[] {
+  if (!Array.isArray(raw)) return []
+  const out: RankPoint[] = []
+  for (const p of raw as Array<Record<string, unknown>>) {
+    const rank = safeParseFloat(p?.y)
+    const total = safeParseFloat(p?.sc)
+    const x = safeParseFloat(p?.x)
+    if (!Number.isFinite(rank) || rank <= 0) continue
+    out.push({
+      date: Number.isFinite(x) && x > 0 ? dayjs(x).format('YYYY-MM-DD') : '',
+      rank,
+      total: Number.isFinite(total) ? total : 0,
+    })
+  }
+  return out
 }
 
 export async function getFundFullData(fundCode: string): Promise<{
@@ -71,11 +209,8 @@ export async function getFundFullData(fundCode: string): Promise<{
       fundCode,
       fundName: w.fS_name ?? '',
       fundType: w.fS_type ? (FUND_TYPE_MAP[String(w.fS_type)] || String(w.fS_type)) : '',
-      fundManager: Array.isArray(w.Data_currentFundManager) && w.Data_currentFundManager.length > 0
-        ? (w.Data_currentFundManager[0]?.name ?? '--') : '--',
-      fundScale: Array.isArray(w.Data_fluctuationScale) && w.Data_fluctuationScale.length > 0
-        ? (w.Data_fluctuationScale[w.Data_fluctuationScale.length - 1]?.money
-           ?? w.Data_fluctuationScale[w.Data_fluctuationScale.length - 1]?.assetMoney ?? '--') : '--',
+      fundManager: '--',
+      fundScale: '--',
       establishDate: history.length > 0 ? history[0].date : '',
       dayGrowthDate: history.length > 0 ? history[history.length - 1].date : null,
       performanceItems: [],
@@ -87,6 +222,13 @@ export async function getFundFullData(fundCode: string): Promise<{
       topHoldings: [],
       holderStructure: [],
       peerRanking: '',
+      managers: [],
+      assetAllocHistory: null,
+      holderHistory: null,
+      scaleHistory: [],
+      buySedemption: null,
+      positionTrend: [],
+      peerRankTrend: [],
     }
 
     const calcGrowth = (days: number): number | null => {
@@ -116,41 +258,40 @@ export async function getFundFullData(fundCode: string): Promise<{
       if (val != null && Number.isFinite(val)) partial.performanceItems!.push({ title: p.title, value: val })
     }
 
-    if (Array.isArray(w.Data_assetAllocation) && w.Data_assetAllocation.length > 0) {
-      const latest = w.Data_assetAllocation[w.Data_assetAllocation.length - 1]
-      if (latest?.assetAllocationList) {
-        partial.assetAllocation = latest.assetAllocationList
-          .filter((a: any) => a.name && a.ratio)
-          .map((a: any) => ({ category: a.name, ratio: safeParseFloat(a.ratio) }))
-      }
+    const assetAllocHistory = parsePeriodSeries(w.Data_assetAllocation)
+    const holderHistory = parsePeriodSeries(w.Data_holderStructure)
+    const buySedemption = parsePeriodSeries(w.Data_buySedemption)
+    const scaleHistory = parseScaleHistory(w.Data_fluctuationScale)
+    const managers = parseManagers(w.Data_currentFundManager)
+    const positionTrend = parsePositionTrend(w.Data_fundSharesPositions)
+    const peerRankTrend = parsePeerRankTrend(w.Data_rateInSimilarType)
+
+    partial.assetAllocHistory = assetAllocHistory
+    partial.holderHistory = holderHistory
+    partial.buySedemption = buySedemption
+    partial.scaleHistory = scaleHistory
+    partial.managers = managers
+    partial.positionTrend = positionTrend
+    partial.peerRankTrend = peerRankTrend
+
+    partial.assetAllocation = latestOfSeries(assetAllocHistory)
+      .filter(a => !a.name.includes('净资产') && a.value > 0)
+      .map(a => ({ category: a.name.replace(/占净比$/, ''), ratio: a.value }))
+
+    partial.holderStructure = latestOfSeries(holderHistory)
+      .filter(h => h.value > 0)
+      .map(h => ({ holderType: h.name.replace(/持有比例$/, ''), ratio: h.value }))
+
+    if (managers.length > 0) partial.fundManager = managers.map(m => m.name).join('、')
+
+    if (scaleHistory.length > 0) {
+      const latest = scaleHistory[scaleHistory.length - 1]
+      partial.fundScale = `${latest.scale.toFixed(2)}亿`
     }
 
-    if (Array.isArray(w.Data_fundSharesPositions) && w.Data_fundSharesPositions.length > 0) {
-      const latest = w.Data_fundSharesPositions[w.Data_fundSharesPositions.length - 1]
-      if (latest?.fundSharesPositionsList) {
-        partial.topHoldings = latest.fundSharesPositionsList
-          .slice(0, 10)
-          .filter((s: any) => s.name && s.ratio)
-          .map((s: any) => ({ stockCode: s.code ?? '', stockName: s.name, ratio: safeParseFloat(s.ratio) }))
-      }
-    }
-
-    if (Array.isArray(w.Data_holderStructure) && w.Data_holderStructure.length > 0) {
-      const latest = w.Data_holderStructure[w.Data_holderStructure.length - 1]
-      if (latest?.holderStructureList) {
-        partial.holderStructure = latest.holderStructureList
-          .filter((h: any) => h.name && h.ratio)
-          .map((h: any) => ({ holderType: h.name, ratio: safeParseFloat(h.ratio) }))
-      }
-    }
-
-    if (Array.isArray(w.Data_rateInSimilarType) && w.Data_rateInSimilarType.length > 0) {
-      const latest = w.Data_rateInSimilarType[w.Data_rateInSimilarType.length - 1]
-      if (latest) {
-        const rankStr = String(latest.rank ?? latest.syl ?? '')
-        const parts = rankStr.split('|')
-        partial.peerRanking = parts.length === 2 ? `${parts[0]}/${parts[1]}` : rankStr || '--'
-      }
+    if (peerRankTrend.length > 0) {
+      const latest = peerRankTrend[peerRankTrend.length - 1]
+      partial.peerRanking = latest.total > 0 ? `${latest.rank}/${latest.total}` : String(latest.rank)
     }
 
     info = partial as FundFullInfo
