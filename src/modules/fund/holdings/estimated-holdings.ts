@@ -169,7 +169,7 @@ export async function fetchEstimatedHoldings(
     }
 
     if (preloaded?.fundSharesPositions != null) {
-      enrichNamesFromFundSharesPositions(top10.holdings, preloaded.fundSharesPositions, 'override')
+      enrichNamesFromFundSharesPositions(top10.holdings, preloaded.fundSharesPositions, 'fill')
     }
     if (top10.holdings.some(h => !(h.ratio > 0))) {
       const prev = holdingsEnrichedReady
@@ -179,7 +179,7 @@ export async function fetchEstimatedHoldings(
         try {
           if (prev) await prev
           const g = await loadPingzhongRaw(fundCode)
-          if (g) enrichNamesFromFundSharesPositions(top10!.holdings, g, 'override')
+          if (g) enrichNamesFromFundSharesPositions(top10!.holdings, g, 'fill')
         } catch {  }
         try {
           if (top10!.holdings.some(h => !(h.ratio > 0))) {
