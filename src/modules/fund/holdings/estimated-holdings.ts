@@ -86,7 +86,6 @@ function fillRatiosByRounds(
     taken.add(i)
     h.ratio = d.ratio
     if (!h.emMarketCode && d.emMarketCode) h.emMarketCode = d.emMarketCode
-    if (!h.stockName && d.stockName) h.stockName = d.stockName
     changed = true
   }
 
