@@ -114,7 +114,10 @@ async function tickOnce(): Promise<boolean> {
 
   const { overseas: overseasMissing } = store.collectMissingStocks()
   const overseasAll = store.collectOverseasAll()
-  if (overseasAll.length === 0) return false
+  if (overseasAll.length === 0) {
+    await sleep(RETRY_INTERVAL)
+    return true
+  }
 
   const closeMissing = overseasMissing.length > 0
   let hadMissing = false
@@ -229,9 +232,10 @@ async function runMode(
 
   await acquireSlot(mode)
   try {
-    const CHUNK = mode === 'realtime' ? 8 : fetchEntries.length
-    for (let i = 0; i < fetchEntries.length; i += CHUNK) {
-      const slice = fetchEntries.slice(i, i + CHUNK)
+    const CHUNK = mode === 'realtime' ? 20 : fetchEntries.length
+    const groups: Array<typeof fetchEntries> = []
+    for (let i = 0; i < fetchEntries.length; i += CHUNK) groups.push(fetchEntries.slice(i, i + CHUNK))
+    await runConcurrent(groups, 5, async (slice) => {
       const batch = slice.map(x => ({
         symbol: x.sym.symbol,
         market: stockMarketToTz(x.sym.market) as MarketTz,
@@ -267,8 +271,8 @@ async function runMode(
         // eslint-disable-next-line no-console
         console.warn(`[yahoo] ${mode}取数失败 ${nullCnt}/${slice.length}（多为代理波动，loop 会接力重试）`)
       }
-      if (onChunk && chunkResult.size > 0) await onChunk(chunkResult, slice.map(x => x.e))
-    }
+      if (onChunk && chunkResult.size > 0) void onChunk(chunkResult, slice.map(x => x.e))
+    })
   } finally {
     releaseSlot(mode)
   }
