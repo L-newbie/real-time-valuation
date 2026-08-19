@@ -27,6 +27,8 @@ const HOST_BUDGET: Record<string, number> = {
   'ifzq.gtimg.cn': 4,
   'query1.finance.yahoo.com': 2,
   'api.allorigins.win': 4,
+  'corsproxy.io': 4,
+  'danjuanfunds.com': 3,
 }
 
 interface Lane {
