@@ -185,7 +185,7 @@ describe('00 · 基础健康', () => {
     //  2) featureCase 静态调用数 —— 防止用例被逐条删除
     //     （注：01 页面/组件渲染用循环批量生成，静态数少于实际运行数，此处只卡静态written 的部分）
     const FILE_BASELINE = 12
-    const CASE_BASELINE = 219
+    const CASE_BASELINE = 222
 
     t.check(
       `测试文件数 ${files.length} 不低于基线 ${FILE_BASELINE}`,

@@ -44,6 +44,19 @@ const SAMPLE_FUNDGZ = {
   gztime: '2026-08-07 14:30',
 }
 
+/** 蛋卷基金持仓：占比嵌在 data.fund_position.stock_list，不在 data.stock_list */
+const SAMPLE_DANJUAN = {
+  data: {
+    fund_company: '华夏基金',
+    fund_position: {
+      stock_list: [
+        { code: '600519', name: '贵州茅台', percent: 9.68, percent_double: 9.68, xq_symbol: 'SH600519' },
+        { code: '000858', name: '五粮液', percent: 7.35, percent_double: 7.35, xq_symbol: 'SZ000858' },
+      ],
+    },
+  },
+}
+
 /** 股票行情（东财 push2 ulist） */
 const SAMPLE_EM_QUOTES = {
   rc: 0,
@@ -210,6 +223,7 @@ function matchSample(url: string): unknown {
   if (u.includes('f10dataapi')) return SAMPLE_LSJZ
   if (u.includes('fundarchivesdatas')) return SAMPLE_F10
   if (u.includes('pingzhongdata')) return SAMPLE_PINGZHONG
+  if (u.includes('danjuanfunds') || u.includes('djapi')) return SAMPLE_DANJUAN
   if (u.includes('fundmobapi')) return { Datas: { fundStocks: [{ GPDM: '600519', GPJC: '贵州茅台', JZBL: '8.50' }] }, ErrCode: 0 }
   if (u.includes('searchapi.eastmoney')) return SAMPLE_STOCK_SEARCH
   if (u.includes('push2his') || u.includes('kline')) return SAMPLE_EM_KLINE
