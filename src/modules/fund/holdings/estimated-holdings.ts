@@ -5,7 +5,7 @@ import type { StockQuoteInfo } from '@/shared/types/common-types'
 import { isValidFundCode } from '@/shared/utils/validation'
 import { fetchTop10FromMobileApi } from './f10-mobile-fetch'
 import { fetchTop10FromPingzhong, enrichMarketCodeFromPingzhong, enrichNamesFromFundSharesPositions, loadPingzhongHoldings, type PingzhongPreloaded } from './pingzhong-holdings-fetch'
-import { fetchDanjuanHoldings, fetchDanjuanRatios } from './danjuan-holdings-fetch'
+import { fetchDanjuanRatios } from './danjuan-holdings-fetch'
 import { loadPingzhong } from '@/shared/net/pingzhong-loader'
 
 export type FetchStockQuotes = (
@@ -15,7 +15,7 @@ export type FetchStockQuotes = (
 
 const noopFetchStockQuotes: FetchStockQuotes = async () => new Map()
 
-type HoldingsSource = 'danjuan' | 'mobile' | 'pingzhong'
+type HoldingsSource = 'mobile' | 'pingzhong'
 
 async function loadPingzhongRaw(fundCode: string): Promise<unknown> {
   const g = await loadPingzhong(fundCode)
@@ -34,13 +34,6 @@ function fillRatiosFromMap(holdings: FundAllHoldings['holdings'], ratios: Map<st
   return changed
 }
 
-async function fetchTop10FromDanjuan(fundCode: string): Promise<FundAllHoldings | null> {
-  const holdings = await fetchDanjuanHoldings(fundCode)
-  if (!holdings || holdings.length === 0) return null
-  if (!holdings.some(h => h.ratio > 0)) return null
-  return { reportDate: '', reportType: '季报', isFull: false, holdings: holdings.slice(0, 10) }
-}
-
 export async function fetchEstimatedHoldings(
   fundCode: string,
   year?: string,
@@ -49,12 +42,8 @@ export async function fetchEstimatedHoldings(
 ): Promise<EstimatedHoldings | null> {
   if (!isValidFundCode(fundCode)) return null
 
-  let source: HoldingsSource = 'danjuan'
-  let top10: FundAllHoldings | null = await fetchTop10FromDanjuan(fundCode)
-  if (!top10 || top10.holdings.length === 0) {
-    source = 'mobile'
-    top10 = await fetchTop10FromMobileApi(fundCode)
-  }
+  let source: HoldingsSource = 'mobile'
+  let top10: FundAllHoldings | null = await fetchTop10FromMobileApi(fundCode)
   if (!top10 || top10.holdings.length === 0) {
     source = 'pingzhong'
     top10 = await fetchTop10FromPingzhong(fundCode, preloaded)
@@ -93,7 +82,7 @@ export async function fetchEstimatedHoldings(
           if (g) enrichNamesFromFundSharesPositions(top10!.holdings, g, 'override')
         } catch {  }
         try {
-          if (source !== 'danjuan' && !top10!.holdings.some(h => h.ratio > 0)) {
+          if (!top10!.holdings.some(h => h.ratio > 0)) {
             const ratios = await fetchDanjuanRatios(fundCode)
             if (ratios) fillRatiosFromMap(top10!.holdings, ratios)
           }
