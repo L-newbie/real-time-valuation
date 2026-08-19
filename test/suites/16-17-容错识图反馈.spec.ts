@@ -145,6 +145,67 @@ describe('16 · 取数容错', () => {
     const r = await t.act('接口挂时查询节假日', () => callSafely(fn, 2026))
     t.check('未抛异常（走降级）', !r.threw, `节假日接口失败时抛异常：${r.err}`)
   })
+
+  featureCase('16-16', 'pingzhong 资产配置解析出非空占比', async t => {
+    const m = await t.act('导入基金全量数据模块', async () => await import('@/modules/fund/services/fund-full-data-fetch'))
+    const r = await t.act('取 000001 全量数据', () => m.getFundFullData('000001'))
+    const alloc = r.info?.assetAllocation ?? []
+    t.check('资产配置非空', alloc.length > 0, '资产配置为空 —— 接口结构变化会让「资金配置」页整片空白')
+    t.check('占比为有效数字', alloc.every(a => Number.isFinite(a.ratio)), `占比含 NaN：${JSON.stringify(alloc)}`)
+    t.check('股票占比大于 0', alloc.some(a => a.category.includes('股票') && a.ratio > 0), `未解析出股票占比：${JSON.stringify(alloc)}`)
+    t.check('已剔除净资产项', !alloc.some(a => a.category.includes('净资产')), '净资产被当成配置项 —— 占比合计会超 100%')
+  })
+
+  featureCase('16-17', 'pingzhong 持有人结构解析出非空占比', async t => {
+    const m = await t.act('导入基金全量数据模块', async () => await import('@/modules/fund/services/fund-full-data-fetch'))
+    const r = await t.act('取 000001 全量数据', () => m.getFundFullData('000001'))
+    const holder = r.info?.holderStructure ?? []
+    t.check('持有人结构非空', holder.length > 0, '持有人结构为空 —— 接口结构变化会让「持有人」页整片空白')
+    t.check('占比为有效数字', holder.every(h => Number.isFinite(h.ratio)), `占比含 NaN：${JSON.stringify(holder)}`)
+    t.check('含个人持有比例', holder.some(h => h.holderType.includes('个人')), `未解析出个人持有比例：${JSON.stringify(holder)}`)
+  })
+
+  featureCase('16-18', 'pingzhong 基金规模与同类排名解析可用', async t => {
+    const m = await t.act('导入基金全量数据模块', async () => await import('@/modules/fund/services/fund-full-data-fetch'))
+    const r = await t.act('取 000001 全量数据', () => m.getFundFullData('000001'))
+    const info = r.info
+    t.check('基金规模非占位符', !!info && info.fundScale !== '--' && info.fundScale.length > 0, `基金规模为「${info?.fundScale}」—— 详情页显示 --`)
+    t.check('规模不含 NaN', !String(info?.fundScale).includes('NaN'), `基金规模算出 NaN：「${info?.fundScale}」`)
+    t.check('同类排名非占位符', !!info && info.peerRanking !== '--' && info.peerRanking.length > 0, `同类排名为「${info?.peerRanking}」—— 详情页显示 --`)
+    t.check('规模历史非空', (info?.scaleHistory.length ?? 0) > 0, '规模变动历史为空')
+  })
+
+  featureCase('16-19', 'pingzhong 基金经理五维能力解析可用', async t => {
+    const m = await t.act('导入基金全量数据模块', async () => await import('@/modules/fund/services/fund-full-data-fetch'))
+    const r = await t.act('取 000001 全量数据', () => m.getFundFullData('000001'))
+    const managers = r.info?.managers ?? []
+    t.check('基金经理非空', managers.length > 0, '基金经理列表为空')
+    t.check('经理有姓名', managers.every(x => x.name.length > 0), '存在无姓名的经理条目')
+    t.check('五维能力已解析', (managers[0]?.power.length ?? 0) >= 3, `五维能力仅 ${managers[0]?.power.length ?? 0} 项 —— 雷达图画不出来`)
+    t.check('能力值为有效数字', (managers[0]?.power ?? []).every(p => Number.isFinite(p.value)), '能力值含 NaN')
+    t.check('任期收益已解析', managers[0]?.tenureReturn != null && Number.isFinite(managers[0].tenureReturn), `任期收益为 ${managers[0]?.tenureReturn}`)
+  })
+
+  featureCase('16-20', 'pingzhong 仓位走势与申购赎回解析可用', async t => {
+    const m = await t.act('导入基金全量数据模块', async () => await import('@/modules/fund/services/fund-full-data-fetch'))
+    const r = await t.act('取 000001 全量数据', () => m.getFundFullData('000001'))
+    const info = r.info
+    const trend = info?.positionTrend ?? []
+    t.check('仓位走势非空', trend.length > 0, '仓位走势为空 —— 折线图画不出来')
+    t.check('走势点为有效数值', trend.every(p => Number.isFinite(p[0]) && Number.isFinite(p[1])), `走势点含 NaN：${JSON.stringify(trend.slice(0, 2))}`)
+    t.check('时间戳为正数', trend.every(p => p[0] > 0), '走势时间戳非正数')
+    t.check('申购赎回已解析', (info?.buySedemption?.series.length ?? 0) > 0, '申购赎回为空')
+  })
+
+  featureCase('16-21', 'pingzhong 字段异常时全量解析不崩（降级）', async t => {
+    const m = await t.act('导入基金全量数据模块', async () => await import('@/modules/fund/services/fund-full-data-fetch'))
+    await t.act('切换到脏数据模式', () => setNetMode('dirty'))
+    const r = await t.act('脏数据下取数（不应抛异常）', () => callSafely(m.getFundFullData, '000001'))
+    t.check('脏数据未抛异常', !r.threw, `脏数据导致抛异常：${r.err} —— 部分基金字段为 null 时详情页会崩`)
+    await t.act('切换到接口失败模式', () => setNetMode('fail'))
+    const r2 = await t.act('接口失败下取数（不应抛异常）', () => callSafely(m.getFundFullData, '000001'))
+    t.check('接口失败未抛异常', !r2.threw, `接口失败导致抛异常：${r2.err}`)
+  })
 })
 
 describe('17 · 识图与反馈', () => {
