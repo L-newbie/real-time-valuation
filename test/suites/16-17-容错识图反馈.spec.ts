@@ -206,6 +206,40 @@ describe('16 · 取数容错', () => {
     const r2 = await t.act('接口失败下取数（不应抛异常）', () => callSafely(m.getFundFullData, '000001'))
     t.check('接口失败未抛异常', !r2.threw, `接口失败导致抛异常：${r2.err}`)
   })
+
+  featureCase('16-22', '蛋卷持仓取数：占比嵌在 fund_position 内也能取到', async t => {
+    const m = await t.act('导入蛋卷取数模块', async () => await import('@/modules/fund/holdings/danjuan-holdings-fetch'))
+    const list = await t.act('取 000001 蛋卷持仓', () => m.fetchDanjuanHoldings('000001'))
+    t.check('取到持仓', Array.isArray(list) && list.length > 0,
+      '蛋卷持仓为空 —— 占比嵌在 data.fund_position.stock_list，只查 data.stock_list 会漏掉')
+    t.check('全部有占比', (list ?? []).every(h => h.ratio > 0), `存在零占比条目：${JSON.stringify(list)}`)
+    t.check('占比为有效数字', (list ?? []).every(h => Number.isFinite(h.ratio)), '占比含 NaN')
+    t.check('有股票名称', (list ?? []).every(h => h.stockName.length > 0), '存在无名称的持仓')
+
+    const ratios = await t.act('取占比 Map', () => m.fetchDanjuanRatios('000001'))
+    t.check('占比 Map 非空', (ratios?.size ?? 0) > 0, '占比 Map 为空')
+  })
+
+  featureCase('16-23', '持仓主链路：蛋卷优先且产出带占比', async t => {
+    const m = await t.act('导入推算持仓模块', async () => await import('@/modules/fund/holdings/estimated-holdings'))
+    const est = await t.act('取 000001 推算持仓', () => m.fetchEstimatedHoldings('000001'))
+    t.check('取到持仓', !!est && est.holdings.length > 0, '推算持仓为空')
+    t.check('有占比', (est?.holdings ?? []).some(h => h.ratio > 0),
+      '持仓全部零占比 —— 无法加权推算估值，界面会显示「无占比」')
+    t.check('描述不含「无占比」', !String(est?.description).includes('无占比'),
+      `描述为「${est?.description}」`)
+    t.check('占比不含 NaN', (est?.holdings ?? []).every(h => Number.isFinite(h.ratio)), '占比含 NaN')
+  })
+
+  featureCase('16-24', '持仓链路在接口全失败时降级不崩', async t => {
+    const m = await t.act('导入推算持仓模块', async () => await import('@/modules/fund/holdings/estimated-holdings'))
+    await t.act('切换到接口失败模式', () => setNetMode('fail'))
+    const r = await t.act('全部接口挂时取持仓（不应抛异常）', () => callSafely(m.fetchEstimatedHoldings, '000001'))
+    t.check('未抛异常', !r.threw, `接口全失败时抛异常：${r.err} —— 详情页会崩`)
+    await t.act('切换到脏数据模式', () => setNetMode('dirty'))
+    const r2 = await t.act('脏数据下取持仓（不应抛异常）', () => callSafely(m.fetchEstimatedHoldings, '000001'))
+    t.check('脏数据未抛异常', !r2.threw, `脏数据时抛异常：${r2.err}`)
+  })
 })
 
 describe('17 · 识图与反馈', () => {
