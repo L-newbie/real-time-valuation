@@ -33,7 +33,7 @@ async function fetchYahooQuote(
   const range = mode === 'realtime' ? '1d' : '1mo'
   const targetUrl = `${API_URLS.YAHOO_CHART}/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&includePrePost=true`
 
-  const timeout = 6000
+  const timeout = 3000
   const { data, proxyFailed } = await fetchWithProxyRotation(targetUrl, timeout)
   if (proxyFailed || !data) {
     return { rate: null, date: null, proxyFailed }
@@ -100,7 +100,7 @@ self.onmessage = async (e: MessageEvent<WorkerIncomingMessage>) => {
 
     const yahooEntries = entries.filter(e => !results.has(e.symbol))
 
-    const BATCH_CONCURRENCY = 6
+    const BATCH_CONCURRENCY = 4
     let idx = 0
     const size = Math.min(BATCH_CONCURRENCY, yahooEntries.length)
     const workers = Array.from({ length: size }, async () => {
