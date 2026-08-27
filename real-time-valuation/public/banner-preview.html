@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>banner.svg 预览</title>
+<style>
+  body { margin:0; background:#0a0d11; color:#c3ccd2; font-family:system-ui,-apple-system,"PingFang SC",sans-serif; padding:32px; }
+  h1 { font-size:18px; font-weight:700; color:#f5f7f8; margin:0 0 6px; }
+  p { font-size:13px; color:#8a97a0; margin:0 0 24px; }
+  .box { max-width:1200px; margin:0 auto 32px; border-radius:12px; overflow:hidden; border:1px solid rgba(210,224,232,0.1); }
+  img { display:block; width:100%; }
+  .label { font-size:12px; color:#8a97a0; max-width:1200px; margin:0 auto 8px; }
+</style>
+</head>
+<body>
+<h1>banner.svg 动画预览</h1>
+<p>24 秒循环，四屏轮播。下面用 &lt;img&gt; 引入，与 GitHub README 的渲染方式完全一致（禁 script、禁交互）。</p>
+
+<div class="label">img 引入（GitHub 实际效果）</div>
+<div class="box"><img src="banner.svg" alt="基攻宝"></div>
+
+<div class="label">按 README 宽度约束（880px）</div>
+<div class="box" style="max-width:880px"><img src="banner.svg" alt="基攻宝"></div>
+
+<div class="label">窄屏（420px）</div>
+<div class="box" style="max-width:420px"><img src="banner.svg" alt="基攻宝"></div>
+</body>
+</html>

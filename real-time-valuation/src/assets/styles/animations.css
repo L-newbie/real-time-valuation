@@ -1,0 +1,237 @@
+
+
+.animate-fade-in {
+  animation: fadeIn var(--duration-fast) var(--ease-out-expo) both;
+}
+
+.animate-slide-up {
+  animation: slideUp var(--duration-normal) var(--ease-out-expo) both;
+}
+
+.animate-slide-down {
+  animation: slideDown var(--duration-normal) var(--ease-out-expo) both;
+}
+
+.animate-rise-in {
+  animation: riseIn var(--duration-normal) var(--ease-out-expo) both;
+}
+
+.animate-pulse-number {
+  animation: pulseNumber var(--duration-normal) var(--ease-out-expo);
+}
+
+.animate-breathe {
+  animation: breathe 2s var(--ease-smooth) infinite;
+}
+
+.animate-spin-slow {
+  animation: spin 1.5s linear infinite;
+}
+
+.animate-stagger {
+  animation: riseIn var(--duration-normal) var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger-step));
+}
+
+.animate-stagger-auto > *:nth-child(1)  { animation-delay: 0ms; }
+.animate-stagger-auto > *:nth-child(2)  { animation-delay: 45ms; }
+.animate-stagger-auto > *:nth-child(3)  { animation-delay: 90ms; }
+.animate-stagger-auto > *:nth-child(4)  { animation-delay: 135ms; }
+.animate-stagger-auto > *:nth-child(5)  { animation-delay: 180ms; }
+.animate-stagger-auto > *:nth-child(6)  { animation-delay: 225ms; }
+.animate-stagger-auto > *:nth-child(7)  { animation-delay: 270ms; }
+.animate-stagger-auto > *:nth-child(8)  { animation-delay: 315ms; }
+.animate-stagger-auto > *:nth-child(9)  { animation-delay: 360ms; }
+.animate-stagger-auto > *:nth-child(10) { animation-delay: 405ms; }
+.animate-stagger-auto > *:nth-child(11) { animation-delay: 450ms; }
+.animate-stagger-auto > *:nth-child(12) { animation-delay: 495ms; }
+.animate-stagger-auto > * {
+  animation: riseIn var(--duration-normal) var(--ease-out-expo) both;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translate3d(0, 12px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slideDown {
+  0% { opacity: 0; transform: translate3d(0, -12px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes riseIn {
+  0%   { opacity: 0; transform: translate3d(0, 16px, 0); filter: blur(4px); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0);   filter: blur(0); }
+}
+
+@keyframes pulseNumber {
+  0%   { opacity: 0.55; transform: scale(1.04); }
+  50%  { opacity: 1;    transform: scale(1); }
+  100% { opacity: 1;    transform: scale(1); }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes sheetUp {
+  0%   { transform: translate3d(0, 100%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes sheetDown {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(0, 100%, 0); }
+}
+.sheet-enter-active {
+  animation: sheetUp var(--duration-slow) var(--ease-out-expo);
+}
+.sheet-leave-active {
+  animation: sheetDown var(--duration-fast) var(--ease-out-expo);
+}
+.sheet-mask-enter-active,
+.sheet-mask-leave-active {
+  transition: opacity var(--duration-fast) var(--ease-smooth);
+}
+.sheet-mask-enter-from,
+.sheet-mask-leave-to { opacity: 0; }
+
+@keyframes marqueeScroll {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+.animate-marquee {
+  animation: marqueeScroll var(--marquee-duration, 30s) linear infinite;
+  will-change: transform;
+}
+.animate-marquee:hover { animation-play-state: paused; }
+
+@keyframes fabGlow {
+  0%, 100% { box-shadow: 0 4px 20px var(--color-primary-glow); }
+  50% { box-shadow: 0 4px 32px var(--color-primary-glow), 0 0 12px var(--color-primary-glow); }
+}
+
+@keyframes celebrateScale {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px var(--color-primary-glow); }
+  50% { box-shadow: 0 0 40px var(--color-primary-glow), 0 0 60px var(--color-primary-glow); }
+}
+
+.animate-scale-in {
+  animation: scaleIn var(--duration-normal) var(--ease-spring) both;
+}
+@keyframes scaleIn {
+  0% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg,
+    var(--bg-card) 0%,
+    var(--bg-card-hover) 50%,
+    var(--bg-card) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.transition-colors {
+  transition: color var(--transition-fast),
+              background-color var(--transition-fast),
+              border-color var(--transition-fast);
+}
+.transition-opacity { transition: opacity var(--transition-normal); }
+.transition-transform { transition: transform var(--transition-normal); }
+.transition-all { transition: all var(--transition-normal); }
+
+/* ── 路由过渡 ──────────────────────────────────────
+   最朴素的做法：新页淡入，旧页直接撤走。
+
+   之所以不做「进出协同 / 交叉淡化」：两页同时在场必然带来
+   重叠、错位、露底三选一 —— 尤其宽屏下离场页要绝对定位，
+   就跟居中的新页对不齐。单页淡入没有这些问题，
+   240ms 内完成，快到看不出旧页是什么时候消失的。 */
+
+/* 旧页不参与动画，立刻脱离文档流并隐藏 */
+.route-fwd-leave-active,
+.route-back-leave-active,
+.route-fade-leave-active {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 新页淡入。不加位移与缩放 —— 位移会在边缘露白，
+   缩放会让文字在动画期间发虚，都得不偿失。 */
+.route-fwd-enter-active,
+.route-back-enter-active,
+.route-fade-enter-active {
+  transition: opacity var(--duration-route, 200ms) var(--ease-out-expo);
+  will-change: opacity;
+}
+.route-fwd-enter-from,
+.route-back-enter-from,
+.route-fade-enter-from {
+  opacity: 0;
+}
+
+/* ── 主题切换的揭示动效 ──────────────────────────────
+   View Transition 把切换前后各拍一张快照叠在一起。
+   新快照做圆形 clip-path 扩散，旧快照在尾段淡出 ——
+   圆从中心扩散时四角必然最后一起填满，纯靠速度曲线消不掉那下收口，
+   所以用交叉淡化把它抹平。
+
+   两条动画都由 JS 用 Web Animations API 驱动，
+   逐段半径按「已覆盖面积」反解，不同视口比例自动适配。
+   见 shared/theme/theme-transition.ts。 */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  /* 关掉浏览器默认的交叉淡入淡出，改由 JS 的 WAAPI 动画主导 */
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-theme-reveal]::view-transition-old(root) { z-index: 0; }
+
+html[data-theme-reveal]::view-transition-new(root) {
+  z-index: 1;
+  /* 提示合成器单独提层，压掉扩散过程中的抖动 */
+  will-change: clip-path;
+}
+
+/* 揭示期间关掉全局色彩过渡：快照本身已经是切换后的画面，
+   若 DOM 恢复时再渐变 800ms，会出现「揭示完了还在慢慢变色」的拖沓。 */
+html[data-theme-reveal] body {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee { animation: none !important; }
+  /* 降低动效偏好下不做揭示，直接切 */
+  html[data-theme-reveal]::view-transition-new(root) { animation: none; }
+}
+
+/* 页面切到后台时冻结所有无限循环动画。浏览器只会节流 rAF，
+   CSS 动画照跑不误 —— 而这类装饰动画在看不见时毫无价值。
+   由 main.ts 依据 visibilitychange 挂上 .app-hidden。 */
+html.app-hidden *,
+html.app-hidden *::before,
+html.app-hidden *::after {
+  animation-play-state: paused !important;
+}
