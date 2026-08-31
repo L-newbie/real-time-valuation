@@ -60,14 +60,20 @@ export function useCrossDay() {
     }
   }
 
+  function onPageShow(): void {
+    void onVisibilityChange()
+  }
+
   onMounted(() => {
     startTimer()
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onPageShow)
   })
 
   onUnmounted(() => {
     stopTimer()
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('pageshow', onPageShow)
   })
 
   onActivated(() => {
