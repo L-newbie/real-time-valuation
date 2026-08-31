@@ -1219,16 +1219,15 @@ export const useFundStore = defineStore('fund', () => {
   }
 
   function expireCrossDayValuations(): void {
-    if (!lastBusinessDay.value) return
-    const prevDay = lastBusinessDay.value
-    if (prevDay === getBusinessDay()) return
+    const today = getBusinessDay()
+    const crossDay = !!lastBusinessDay.value && lastBusinessDay.value !== today
 
-    intradayMap.value = {}
+    if (crossDay) intradayMap.value = {}
     let changed = false
     for (const [, v] of valuationMap.value) {
       if (isValuationFresh(v)) continue
       v.isEstimated = true
-      v.staleAsOf = v.gztime?.substring(0, 10) || v.jzrq || prevDay
+      v.staleAsOf = v.gztime?.substring(0, 10) || v.jzrq || ''
       v.realtimeGszzl = undefined
       v.realtimeSource = undefined
       v.realtimeUpdatedAt = undefined
