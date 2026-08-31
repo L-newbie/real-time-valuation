@@ -168,8 +168,13 @@ export function useAutoRefresh() {
     }
   })
 
+  function onPageShow(): void {
+    onVisibilityChange()
+  }
+
   onMounted(() => {
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onPageShow)
 
     if (settingsStore.autoRefresh) {
       startAutoRefresh()
@@ -188,6 +193,7 @@ export function useAutoRefresh() {
 
   onUnmounted(() => {
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('pageshow', onPageShow)
     stopAutoRefresh()
     stopPostMarketPoll()
   })
